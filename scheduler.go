@@ -36,6 +36,7 @@ type Scheduler interface {
 type InMemoryScheduler struct {
 	TickInterval time.Duration
 	ticker       *time.Ticker
+	httpClient   *http.Client
 	jobs         JobMap
 	params       map[string]interface{}
 }
@@ -163,6 +164,7 @@ func (s *InMemoryScheduler) Start() error {
 		return fmt.Errorf("scheduler: scheduler already started")
 	}
 	s.ticker = time.NewTicker(s.TickInterval)
+	s.httpClient = &http.Client{}
 	s.jobs = JobMap{
 		id:    make(map[string]*Job),
 		sched: make(map[int64][]*Job),
@@ -192,23 +194,33 @@ func (s *InMemoryScheduler) tick() {
 		if schedList != nil {
 			log.Printf("scheduler: executing %d callbacks at %v (%v)", len(schedList), now.Unix(), now)
 			for _, job := range schedList {
-				go execute(job)
+				go s.execute(job)
 			}
 		}
 	}
 }
 
-func execute(job *Job) {
-	log.Printf("scheduler: executing job %v", *job)
-
+func (s *InMemoryScheduler) execute(job *Job) {
 	var body = new(bytes.Buffer)
 	encErr := json.NewEncoder(body).Encode(job)
 	if encErr != nil {
-		log.Printf("scheduler: unable to encode job request body: %v", encErr)
+		log.Printf("scheduler: unable to encode request body for job %s: %v", job.ID, encErr)
 	}
 
-	_, err := http.Post(job.CallbackURL, "application/json", body)
-	if err != nil {
-		log.Printf("scheduler: error on job callback: %v", err)
+	req, reqErr := http.NewRequest("POST", job.CallbackURL, body)
+	req.Header.Set("User-Agent", "schedula")
+	if reqErr != nil {
+		log.Printf("scheduler: error creating callback request for job %s: %v", job.ID, reqErr)
+		return
+	}
+
+	res, postErr := s.httpClient.Do(req)
+	if postErr != nil {
+		log.Printf("scheduler: error on job %s callback: %v", job.ID, postErr)
+		return
+	}
+
+	if res.StatusCode == http.StatusOK {
+		log.Printf("schduler: job %s callback succeed: %s", job.ID, res.Status)
 	}
 }
