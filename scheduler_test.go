@@ -5,6 +5,7 @@ import (
 	"log"
 	"strconv"
 	"testing"
+	"time"
 )
 
 func TestSchedulerInitialization(t *testing.T) {
@@ -16,7 +17,13 @@ func TestSchedulerInitialization(t *testing.T) {
 
 func TestAddAndRetrieveJobs(t *testing.T) {
 	s, _ := createScheduler(t)
-	newJob, e := s.Add(Job{CallbackURL: "http://example.com"})
+	newJob, e := s.Add(Job{
+		CallbackURL: "http://example.com",
+		Schedule: JobSchedule{
+			Format: ScheduleFormatTimestamp,
+			Value:  strconv.FormatInt(time.Now().Unix(), 10),
+		},
+	})
 
 	if e != nil {
 		t.Fatalf("failed adding a new job to scheduler: %s", e)
@@ -50,7 +57,7 @@ func TestList(t *testing.T) {
 func TestListWithPagination(t *testing.T) {
 	s, _ := createScheduler(t)
 	addJobs(s, 10)
-	jobs, _ := s.List(1, 6)
+	jobs, _ := s.List(1, 5)
 	if len(jobs) != 5 {
 		t.Fatalf("expected jobs list size to be 5, but got %d", len(jobs))
 	}

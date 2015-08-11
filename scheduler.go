@@ -1,8 +1,11 @@
 package schedula
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 
@@ -12,6 +15,9 @@ import (
 const (
 	// TypeInMemory holds the value for scheduler type 'in-memory'
 	TypeInMemory = "in-memory"
+
+	// DefaultTickInterval is the number of seconds for scheduler's ticker
+	DefaultTickInterval = 1
 )
 
 // Scheduler is a service to schedule jobs
@@ -37,8 +43,9 @@ type InMemoryScheduler struct {
 // JobMap ...
 type JobMap struct {
 	sync.RWMutex
-	m map[string]*Job
-	l []Job
+	id    map[string]*Job
+	sched map[int64][]*Job
+	list  []Job
 }
 
 // InitScheduler creates a new Scheduler instance of the given type.
@@ -47,11 +54,11 @@ func InitScheduler(schedulerType string, params map[string]interface{}) (Schedul
 	switch schedulerType {
 	case TypeInMemory:
 		return &InMemoryScheduler{
-			TickInterval: 10 * time.Second,
+			TickInterval: DefaultTickInterval * time.Second,
 			params:       initParams(params),
 		}, nil
 	}
-	return nil, fmt.Errorf("schedula: invalid scheduler type: '%s'", schedulerType)
+	return nil, fmt.Errorf("scheduler: invalid scheduler type: '%s'", schedulerType)
 }
 
 func initParams(params map[string]interface{}) map[string]interface{} {
@@ -87,8 +94,23 @@ func (s *InMemoryScheduler) Add(job Job) (Job, error) {
 	job.ID = uuid.New()
 	s.jobs.Lock()
 	defer s.jobs.Unlock()
-	s.jobs.l = append(s.jobs.l, job)
-	s.jobs.m[job.ID] = &job
+
+	// add to job list
+	s.jobs.list = append(s.jobs.list, job)
+
+	// add to jobs map by ID
+	s.jobs.id[job.ID] = &job
+
+	// add to jobs map by schedule timetamp
+	jobTimestamp, err := job.Schedule.NextTimestamp()
+	if err != nil {
+		return Job{}, err
+	}
+	if s.jobs.sched[jobTimestamp] == nil {
+		s.jobs.sched[jobTimestamp] = make([]*Job, 0)
+	}
+	s.jobs.sched[jobTimestamp] = append(s.jobs.sched[jobTimestamp], &job)
+
 	return job, nil
 }
 
@@ -96,8 +118,8 @@ func (s *InMemoryScheduler) Add(job Job) (Job, error) {
 func (s *InMemoryScheduler) Get(id string) (Job, error) {
 	s.jobs.RLock()
 	defer s.jobs.RUnlock()
-	if s.jobs.m[id] != nil {
-		return *s.jobs.m[id], nil
+	if s.jobs.id[id] != nil {
+		return *s.jobs.id[id], nil
 	}
 	return Job{}, nil
 }
@@ -106,24 +128,28 @@ func (s *InMemoryScheduler) Get(id string) (Job, error) {
 func (s *InMemoryScheduler) List(skip int, limit int) ([]Job, error) {
 	s.jobs.RLock()
 	defer s.jobs.RUnlock()
-	var end = limit
 
-	if len(s.jobs.m) == 0 || skip > len(s.jobs.m) || limit < 0 {
+	if len(s.jobs.id) == 0 || skip > len(s.jobs.id) || limit < 0 {
 		return make([]Job, 0), nil
 	}
 
-	if limit > len(s.jobs.m) {
-		end = len(s.jobs.m)
+	start := skip
+	if start > len(s.jobs.list) {
+		skip = len(s.jobs.list)
+	}
+	end := skip + limit
+	if end > len(s.jobs.list) {
+		end = len(s.jobs.list)
 	}
 
-	return s.jobs.l[skip:end], nil
+	return s.jobs.list[start:end], nil
 }
 
 // Size returns the number of active jobs in the scheduler
 func (s *InMemoryScheduler) Size() int {
 	s.jobs.RLock()
 	defer s.jobs.RUnlock()
-	return len(s.jobs.l)
+	return len(s.jobs.list)
 }
 
 // Type ...
@@ -134,13 +160,16 @@ func (s *InMemoryScheduler) Type() string {
 // Start ...
 func (s *InMemoryScheduler) Start() error {
 	if s.ticker != nil {
-		return fmt.Errorf("schedula: scheduler already started")
+		return fmt.Errorf("scheduler: scheduler already started")
 	}
 	s.ticker = time.NewTicker(s.TickInterval)
-	s.jobs = JobMap{m: make(map[string]*Job)}
+	s.jobs = JobMap{
+		id:    make(map[string]*Job),
+		sched: make(map[int64][]*Job),
+	}
 
 	if s.params["no-tick-log"].(bool) == false {
-		log.Printf("InMemoryScheduler: start ticking every %d seconds", s.TickInterval/time.Second)
+		log.Printf("scheduler: start ticking every %d seconds", s.TickInterval/time.Second)
 	}
 	go s.tick()
 	return nil
@@ -149,7 +178,7 @@ func (s *InMemoryScheduler) Start() error {
 // Stop ...
 func (s *InMemoryScheduler) Stop() error {
 	if s.ticker == nil {
-		return fmt.Errorf("schedula: scheduler wasn't started, cannot stop")
+		return fmt.Errorf("scheduler: scheduler wasn't started, cannot stop")
 	}
 	s.ticker.Stop()
 	return nil
@@ -157,9 +186,29 @@ func (s *InMemoryScheduler) Stop() error {
 
 func (s *InMemoryScheduler) tick() {
 	for now := range s.ticker.C {
-		if s.params["no-tick-log"].(bool) == false {
-			log.Printf("InMemoryScheduler: tick %s", now)
-			// TODO execute jobs callbacks
+		s.jobs.RLock()
+		schedList := s.jobs.sched[now.Unix()]
+		s.jobs.RUnlock()
+		if schedList != nil {
+			log.Printf("scheduler: executing %d callbacks at %v (%v)", len(schedList), now.Unix(), now)
+			for _, job := range schedList {
+				go execute(job)
+			}
 		}
+	}
+}
+
+func execute(job *Job) {
+	log.Printf("scheduler: executing job %v", *job)
+
+	var body = new(bytes.Buffer)
+	encErr := json.NewEncoder(body).Encode(job)
+	if encErr != nil {
+		log.Printf("scheduler: unable to encode job request body: %v", encErr)
+	}
+
+	_, err := http.Post(job.CallbackURL, "application/json", body)
+	if err != nil {
+		log.Printf("scheduler: error on job callback: %v", err)
 	}
 }

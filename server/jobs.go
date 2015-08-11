@@ -11,6 +11,11 @@ import (
 	"github.com/marcoshack/schedula"
 )
 
+const (
+	// MaxPageSize is the maximum number of items for listing resources
+	MaxPageSize = 100
+)
+
 // JobsHandler is a HTTP handler to retrieve and manipulate jobs
 type JobsHandler struct {
 	Path      string
@@ -29,54 +34,44 @@ func (h *JobsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // List all jobs in JSON format
 func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
-	skip, _ := strconv.Atoi(r.URL.Query().Get("skip"))
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	p := make(map[string]interface{})
+	p["skip"] = ParseIntParam(r, "skip", 0)
+	p["limit"] = ParseIntParam(r, "limit", MaxPageSize)
+	log.Printf("jobs: listing jobs (params: %v)", p)
 
-	log.Printf("jobs: listing jobs (skip=%d, limit=%d)", skip, limit)
-
-	jobs, err := h.scheduler.List(skip, limit)
+	jobs, err := h.scheduler.List(p["skip"].(int), p["limit"].(int))
 	if err != nil {
-		h.errorResponse(err, w, http.StatusInternalServerError)
+		ErrorResponse(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	var resBuf = new(bytes.Buffer)
 	encErr := json.NewEncoder(resBuf).Encode(jobs)
 	if encErr != nil {
-		h.errorResponse(encErr, w, http.StatusInternalServerError)
+		ErrorResponse(encErr, w, http.StatusInternalServerError)
 	}
-	w.Header().Add("Total-Count", strconv.Itoa(len(jobs)))
+	w.Header().Add("Page-Count", strconv.Itoa(len(jobs)))
+	w.Header().Add("Total-Count", strconv.Itoa(h.scheduler.Size()))
 	w.Write(resBuf.Bytes())
 }
 
 // Create a job from a JSON representation
 func (h *JobsHandler) Create(w http.ResponseWriter, r *http.Request) {
-	job, err := h.parseJob(r)
+	job, err := ParseJob(r)
 	if err != nil {
 		log.Printf("jobs: error parsing job: %s", err)
-		h.errorResponse(err, w, http.StatusBadRequest)
+		ErrorResponse(err, w, http.StatusBadRequest)
 		return
 	}
 
 	id, err := h.scheduler.Add(job)
 	if err != nil {
 		log.Printf("jobs: error scheduling job: %s", err)
-		h.errorResponse(err, w, http.StatusInternalServerError)
+		ErrorResponse(err, w, http.StatusInternalServerError)
 		return
 	}
 
 	log.Printf("jobs: job created: %s", job)
 	w.Header().Add("Location", fmt.Sprintf("%s%s", h.Path, id))
 	w.WriteHeader(http.StatusCreated)
-}
-
-func (h *JobsHandler) errorResponse(err error, w http.ResponseWriter, status int) {
-	fmt.Fprintf(w, "{\"error\":\"%s\"}", err)
-	w.WriteHeader(status)
-}
-
-func (h *JobsHandler) parseJob(r *http.Request) (schedula.Job, error) {
-	var job schedula.Job
-	dec := json.NewDecoder(r.Body)
-	return job, dec.Decode(&job)
 }

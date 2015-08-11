@@ -1,6 +1,6 @@
 {
   "callbackURL": "http://examples.com/callback",
-  "timeout": {
+  "schedule": {
     "format": "timestamp",
     "value": "1438950414"
   },

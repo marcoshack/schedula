@@ -3,22 +3,39 @@ package schedula
 import (
 	"bytes"
 	"encoding/json"
-	"log"
+	"strconv"
 	"testing"
 )
 
 func TestJSONMarshal(t *testing.T) {
-	var expected = []byte(`{"id":"","businessKey":"","callbackURL":"http://example.com/","data":null,"timeout":{"format":"timestamp","value":"1438948984"}}`)
-	j := &Job{CallbackURL: "http://example.com/", Timeout: JobTimeout{Format: "timestamp", Value: "1438948984"}}
+	var expected = []byte(`{"id":"","businessKey":"","callbackURL":"http://example.com/","data":null,"schedule":{"format":"timestamp","value":"1438948984"}}`)
+	job := aJob(1438948984)
 
-	b, err := json.Marshal(j)
+	b, err := json.Marshal(job)
 	if err != nil {
-		log.Printf("TestJSONMarshal: %s", err)
-		t.FailNow()
+		t.Fatalf("failed marshaling job: %v", err)
 	}
 
 	if !bytes.Equal(b, expected) {
-		log.Printf("TestJSONMarshal: expected '%s' but got '%s'", expected, b)
-		t.FailNow()
+		t.Fatalf("expected '%v' but got '%v'", expected, b)
+	}
+}
+
+func TestNextTimestamp(t *testing.T) {
+	var expected int64 = 1438948984
+	job := aJob(expected)
+	actual, err := job.Schedule.NextTimestamp()
+	if actual != expected || err != nil {
+		t.Fatalf("expected %d but got %d (error: %v)", expected, actual, err)
+	}
+}
+
+func aJob(timestamp int64) Job {
+	return Job{
+		CallbackURL: "http://example.com/",
+		Schedule: JobSchedule{
+			Format: ScheduleFormatTimestamp,
+			Value:  strconv.FormatInt(timestamp, 10),
+		},
 	}
 }
