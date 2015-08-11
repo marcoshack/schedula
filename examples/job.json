@@ -1,0 +1,11 @@
+{
+  "callbackURL": "http://examples.com/callback",
+  "timeout": {
+    "format": "timestamp",
+    "value": "1438950414"
+  },
+  "data": {
+    "key1": "value1",
+    "key2": "value2"
+  }
+}

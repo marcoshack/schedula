@@ -2,6 +2,15 @@ package schedula
 
 // Job ...
 type Job struct {
-	CallbackURL string
-	Data        map[string]string
+	ID          string            `json:"id"`
+	BusinessKey string            `json:"businessKey"`
+	CallbackURL string            `json:"callbackURL"`
+	Data        map[string]string `json:"data"`
+	Timeout     JobTimeout        `json:"timeout"`
+}
+
+// JobTimeout ...
+type JobTimeout struct {
+	Format string `json:"format"`
+	Value  string `json:"value"`
 }

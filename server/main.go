@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -9,41 +8,26 @@ import (
 )
 
 const (
-	version = "v0.1"
+	version  = "v0.1"
+	jobsPath = "/jobs/"
 )
 
 func main() {
+	log.Printf("Schedula Server %s", version)
 	httpServer := &http.Server{
 		Addr: "127.0.0.1:8080",
 	}
 
-	scheduler, err := schedula.InitScheduler("in-memory")
+	scheduler, err := schedula.StartScheduler("in-memory", map[string]interface{}{})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("schedula: error initializing scheduler: %s", err)
 	}
 
-	http.HandleFunc("/schedules/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "application/json")
+	http.Handle(jobsPath, &JobsHandler{scheduler: scheduler, Path: jobsPath})
 
-		switch r.Method {
-		case "GET":
-			w.Header().Add("Content-Type", "application/json")
-			fmt.Fprint(w, "{\"message\":\"Hello!\"}")
-		case "POST":
-			job := &schedula.Job{CallbackURL: "http://example.com/callback"}
-			id, err := scheduler.Schedule(job)
-			if err != nil {
-				fmt.Fprintf(w, "{\"error\":\"%s\"}", err)
-				w.WriteHeader(http.StatusInternalServerError)
-			} else {
-				w.Header().Add("Location", fmt.Sprintf("/schedules/%s", id))
-				w.WriteHeader(http.StatusCreated)
-			}
-		}
-	})
-
-	log.Printf("Schedula Server %s started", version)
 	log.Printf("Listening on %s", httpServer.Addr)
 	log.Printf("Scheduler type '%s'", scheduler.Type())
-	httpServer.ListenAndServe()
+	log.Fatal(httpServer.ListenAndServe())
+
+	scheduler.Stop()
 }
