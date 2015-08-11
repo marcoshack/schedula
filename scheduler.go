@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"sync"
@@ -207,8 +208,7 @@ func (s *InMemoryScheduler) execute(job *Job) {
 		log.Printf("scheduler: unable to encode request body for job %s: %v", job.ID, encErr)
 	}
 
-	req, reqErr := http.NewRequest("POST", job.CallbackURL, body)
-	req.Header.Set("User-Agent", "schedula")
+	req, reqErr := s.createCallbackRequest(job.CallbackURL, body)
 	if reqErr != nil {
 		log.Printf("scheduler: error creating callback request for job %s: %v", job.ID, reqErr)
 		return
@@ -223,4 +223,14 @@ func (s *InMemoryScheduler) execute(job *Job) {
 	if res.StatusCode == http.StatusOK {
 		log.Printf("schduler: job %s callback succeed: %s", job.ID, res.Status)
 	}
+}
+
+func (s *InMemoryScheduler) createCallbackRequest(urlStr string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest("POST", urlStr, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "schedula")
+	req.Header.Set("Content-Type", "application/json")
+	return req, nil
 }
