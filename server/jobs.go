@@ -34,12 +34,10 @@ func (h *JobsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // List all jobs in JSON format
 func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
-	p := make(map[string]interface{})
-	p["skip"] = ParseIntParam(r, "skip", 0)
-	p["limit"] = ParseIntParam(r, "limit", MaxPageSize)
-	log.Printf("jobs: listing jobs (params: %v)", p)
+	skip := ParseIntParam(r, "skip", 0)
+	limit := ParseIntParam(r, "limit", MaxPageSize)
 
-	jobs, err := h.scheduler.List(p["skip"].(int), p["limit"].(int))
+	jobs, err := h.scheduler.List(skip, limit)
 	if err != nil {
 		ErrorResponse(err, w, http.StatusInternalServerError)
 		return
@@ -49,7 +47,9 @@ func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 	encErr := json.NewEncoder(resBuf).Encode(jobs)
 	if encErr != nil {
 		ErrorResponse(encErr, w, http.StatusInternalServerError)
+		return
 	}
+
 	w.Header().Add("Page-Count", strconv.Itoa(len(jobs)))
 	w.Header().Add("Total-Count", strconv.Itoa(h.scheduler.Size()))
 	w.Write(resBuf.Bytes())
