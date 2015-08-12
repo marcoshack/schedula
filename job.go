@@ -8,6 +8,18 @@ import (
 const (
 	// ScheduleFormatTimestamp ...
 	ScheduleFormatTimestamp = "timestamp"
+
+	// JobStatusSuccess ...
+	JobStatusSuccess = "success"
+
+	// JobStatusPending ...
+	JobStatusPending = "pending"
+
+	// JobStatusError ...
+	JobStatusError = "error"
+
+	// JobStatusFail ...
+	JobStatusFail = "fail"
 )
 
 // Job ...
@@ -17,6 +29,7 @@ type Job struct {
 	CallbackURL string            `json:"callbackURL"`
 	Data        map[string]string `json:"data"`
 	Schedule    JobSchedule       `json:"schedule"`
+	Status      string            `json:"status"`
 }
 
 // JobSchedule ...

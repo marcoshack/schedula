@@ -8,16 +8,16 @@ import (
 )
 
 func TestJSONMarshal(t *testing.T) {
-	var expected = []byte(`{"id":"","businessKey":"","callbackURL":"http://example.com/","data":null,"schedule":{"format":"timestamp","value":"1438948984"}}`)
+	var expected = []byte(`{"id":"","businessKey":"","callbackURL":"http://example.com/","data":null,"schedule":{"format":"timestamp","value":"1438948984"},"status":""}`)
 	job := aJob(1438948984)
 
 	b, err := json.Marshal(job)
 	if err != nil {
-		t.Fatalf("failed marshaling job: %v", err)
+		t.Fatalf("failed marshaling job: %s", err)
 	}
 
 	if !bytes.Equal(b, expected) {
-		t.Fatalf("expected '%v' but got '%v'", expected, b)
+		t.Fatalf("expected '%s' but got '%s'", expected, b)
 	}
 }
 

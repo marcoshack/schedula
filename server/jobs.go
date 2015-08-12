@@ -64,14 +64,14 @@ func (h *JobsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := h.scheduler.Add(job)
+	newJob, err := h.scheduler.Add(job)
 	if err != nil {
 		log.Printf("jobs: error scheduling job: %s", err)
 		ErrorResponse(err, w, http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("jobs: job created: %s", job)
-	w.Header().Add("Location", fmt.Sprintf("%s%s", h.Path, id))
+	log.Printf("jobs: job created: %s", newJob)
+	w.Header().Add("Location", fmt.Sprintf("%s%s", h.Path, newJob.ID))
 	w.WriteHeader(http.StatusCreated)
 }

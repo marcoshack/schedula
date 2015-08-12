@@ -38,12 +38,12 @@ type InMemoryScheduler struct {
 	TickInterval time.Duration
 	ticker       *time.Ticker
 	httpClient   *http.Client
-	jobs         JobMap
+	jobs         InMemoryJobRepository
 	params       map[string]interface{}
 }
 
-// JobMap ...
-type JobMap struct {
+// InMemoryJobRepository ...
+type InMemoryJobRepository struct {
 	sync.RWMutex
 	id    map[string]*Job
 	sched map[int64][]*Job
@@ -94,14 +94,17 @@ func StartScheduler(schedulerType string, params map[string]interface{}) (Schedu
 // Add ...
 func (s *InMemoryScheduler) Add(job Job) (Job, error) {
 	job.ID = uuid.New()
+	job.Status = JobStatusPending
+
 	s.jobs.Lock()
 	defer s.jobs.Unlock()
 
 	// add to job list
 	s.jobs.list = append(s.jobs.list, job)
+	jobAddr := &s.jobs.list[len(s.jobs.list)-1]
 
 	// add to jobs map by ID
-	s.jobs.id[job.ID] = &job
+	s.jobs.id[job.ID] = jobAddr
 
 	// add to jobs map by schedule timetamp
 	jobTimestamp, err := job.Schedule.NextTimestamp()
@@ -111,7 +114,7 @@ func (s *InMemoryScheduler) Add(job Job) (Job, error) {
 	if s.jobs.sched[jobTimestamp] == nil {
 		s.jobs.sched[jobTimestamp] = make([]*Job, 0)
 	}
-	s.jobs.sched[jobTimestamp] = append(s.jobs.sched[jobTimestamp], &job)
+	s.jobs.sched[jobTimestamp] = append(s.jobs.sched[jobTimestamp], jobAddr)
 
 	return job, nil
 }
@@ -166,7 +169,7 @@ func (s *InMemoryScheduler) Start() error {
 	}
 	s.ticker = time.NewTicker(s.TickInterval)
 	s.httpClient = &http.Client{}
-	s.jobs = JobMap{
+	s.jobs = InMemoryJobRepository{
 		id:    make(map[string]*Job),
 		sched: make(map[int64][]*Job),
 	}
@@ -205,24 +208,32 @@ func (s *InMemoryScheduler) execute(job *Job) {
 	var body = new(bytes.Buffer)
 	encErr := json.NewEncoder(body).Encode(job)
 	if encErr != nil {
-		log.Printf("scheduler: unable to encode request body for job %s: %v", job.ID, encErr)
+		log.Printf("scheduler: unable to encode request body for job[ID:%s]: %v", job.ID, encErr)
+		job.Status = JobStatusError
 	}
 
 	req, reqErr := s.createCallbackRequest(job.CallbackURL, body)
 	if reqErr != nil {
-		log.Printf("scheduler: error creating callback request for job %s: %v", job.ID, reqErr)
+		log.Printf("scheduler: error creating callback request for job[ID:%s]: %v", job.ID, reqErr)
+		job.Status = JobStatusError
 		return
 	}
 
 	res, postErr := s.httpClient.Do(req)
 	if postErr != nil {
-		log.Printf("scheduler: error on job %s callback: %v", job.ID, postErr)
+		log.Printf("scheduler: error on job[ID:%s] callback: %v", job.ID, postErr)
+		job.Status = JobStatusError
 		return
 	}
 
-	if res.StatusCode == http.StatusOK {
-		log.Printf("schduler: job %s callback succeed: %s", job.ID, res.Status)
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusAccepted {
+		log.Printf("schduler: job[ID:%s] callback failed: %s", job.ID, res.Status)
+		job.Status = JobStatusFail
+		return
 	}
+
+	log.Printf("schduler: job[ID:%s] callback succeed: %s", job.ID, res.Status)
+	job.Status = JobStatusSuccess
 }
 
 func (s *InMemoryScheduler) createCallbackRequest(urlStr string, body io.Reader) (*http.Request, error) {
