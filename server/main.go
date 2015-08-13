@@ -18,7 +18,8 @@ func main() {
 		Addr: "127.0.0.1:8080",
 	}
 
-	scheduler, err := schedula.StartScheduler("in-memory", map[string]interface{}{})
+	repository, err := schedula.NewRepository()
+	scheduler, err := schedula.InitAndStartScheduler(repository, map[string]interface{}{})
 	if err != nil {
 		log.Fatalf("schedula: error initializing scheduler: %s", err)
 	}
@@ -26,7 +27,6 @@ func main() {
 	http.Handle(jobsPath, &JobsHandler{scheduler: scheduler, Path: jobsPath})
 
 	log.Printf("Listening on %s", httpServer.Addr)
-	log.Printf("Scheduler type '%s'", scheduler.Type())
 	log.Fatal(httpServer.ListenAndServe())
 
 	scheduler.Stop()

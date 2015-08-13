@@ -1,93 +1,85 @@
 package schedula
 
-import (
-	"fmt"
-	"log"
-	"strconv"
-	"testing"
-	"time"
-)
+import "testing"
 
-func TestSchedulerInitialization(t *testing.T) {
-	s, _ := createScheduler(t)
-	if s.Size() != 0 {
-		t.Fatalf("expected scheduler size to be 0 but got %d", s.Size())
-	}
+func TestSchedulerAdd(t *testing.T) {
+	s, r := createScheduler(t)
+	s.Add(Job{})
+	assertReposityCall("Add", 1, r, t)
 }
 
-func TestAddAndRetrieveJobs(t *testing.T) {
-	s, _ := createScheduler(t)
-	newJob, e := s.Add(Job{
-		CallbackURL: "http://example.com",
-		Schedule: JobSchedule{
-			Format: ScheduleFormatTimestamp,
-			Value:  strconv.FormatInt(time.Now().Unix(), 10),
-		},
-	})
-
-	if e != nil {
-		t.Fatalf("failed adding a new job to scheduler: %s", e)
-	}
-	if s.Size() != 1 {
-		t.Fatalf("invalid scheduler size, expected 1 but got %d", s.Size())
-	}
-	job, _ := s.Get(newJob.ID)
-	if job.ID != newJob.ID {
-		log.Print("scheduler_test: failed retrieving job, expected a valid job but got nil")
-	}
+func TestSchedulerList(t *testing.T) {
+	s, r := createScheduler(t)
+	s.List(0, 10)
+	assertReposityCall("List", 1, r, t)
 }
 
-func TestRetrieveANonExistingJob(t *testing.T) {
-	s, _ := createScheduler(t)
-	job, _ := s.Get("non-existing-job-id")
-	if job.ID != "" {
-		t.Fatalf("expected nil but got %s", job)
-	}
+func TestSchedulerGet(t *testing.T) {
+	s, r := createScheduler(t)
+	s.Get("foo")
+	assertReposityCall("Get", 1, r, t)
 }
 
-func TestList(t *testing.T) {
-	s, _ := createScheduler(t)
-	var n = addJobs(s, 5)
-	jobs, _ := s.List(0, 10)
-	if len(jobs) != n {
-		t.Fatalf("expected jobs list size to be %d but got %d", n, len(jobs))
-	}
+func TestSchedulerCount(t *testing.T) {
+	s, r := createScheduler(t)
+	s.Count()
+	assertReposityCall("Count", 1, r, t)
 }
 
-func TestListWithPagination(t *testing.T) {
-	s, _ := createScheduler(t)
-	addJobs(s, 10)
-	jobs, _ := s.List(1, 5)
-	if len(jobs) != 5 {
-		t.Fatalf("expected jobs list size to be 5, but got %d", len(jobs))
-	}
-}
-
-func ExampleScheduler_List_ordering() {
-	s, _ := createScheduler(&testing.T{})
-	n := 10
-	addJobs(s, n)
-	jobs, _ := s.List(0, n)
-	keys := make([]string, n)
-	for j := range jobs {
-		keys[j] = jobs[j].BusinessKey
-	}
-	fmt.Println(keys)
-	// Output:
-	// [0 1 2 3 4 5 6 7 8 9]
-}
-
-func createScheduler(t *testing.T) (Scheduler, error) {
-	s, e := StartScheduler(TypeInMemory, map[string]interface{}{"no-tick-log": true})
+func createScheduler(t *testing.T) (Scheduler, *RepositoryMock) {
+	r := NewRepositoryMock()
+	s, e := InitAndStartScheduler(r, map[string]interface{}{"no-tick-log": true})
 	if e != nil {
 		t.Fatalf("failed to initialize scheduler: %s", e)
 	}
-	return s, nil
+	return s, r
 }
 
-func addJobs(s Scheduler, n int) int {
-	for i := 0; i < n; i++ {
-		s.Add(Job{BusinessKey: strconv.Itoa(i)})
+func assertReposityCall(method string, count int, r *RepositoryMock, t *testing.T) {
+	if r.Counter(method) != 1 {
+		t.Fatalf("expected 1 call to repository but got %d", r.Counter(method))
 	}
-	return n
+}
+
+//
+// TODO replace with a mock framework like golang/mock
+//
+type RepositoryMock struct {
+	counters map[string]int
+}
+
+func NewRepositoryMock() *RepositoryMock {
+	return &RepositoryMock{counters: make(map[string]int)}
+}
+
+func (r *RepositoryMock) Counter(method string) int {
+	return r.counters[method]
+}
+
+func (r *RepositoryMock) Add(job Job) (Job, error) {
+	r.inc("Add")
+	return job, nil
+}
+
+func (r *RepositoryMock) Get(id string) (Job, error) {
+	r.inc("Get")
+	return Job{ID: id}, nil
+}
+
+func (r *RepositoryMock) List(skip int, limit int) ([]Job, error) {
+	r.inc("List")
+	return make([]Job, 0), nil
+}
+
+func (r *RepositoryMock) Count() int {
+	r.inc("Count")
+	return r.counters["Count"]
+}
+
+func (r *RepositoryMock) ListBySchedule(timestamp int64) ([]*Job, error) {
+	return make([]*Job, 0), nil
+}
+
+func (r *RepositoryMock) inc(method string) {
+	r.counters[method]++
 }

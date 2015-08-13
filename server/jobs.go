@@ -51,7 +51,7 @@ func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Add("Page-Count", strconv.Itoa(len(jobs)))
-	w.Header().Add("Total-Count", strconv.Itoa(h.scheduler.Size()))
+	w.Header().Add("Total-Count", strconv.Itoa(h.scheduler.Count()))
 	w.Write(resBuf.Bytes())
 }
 

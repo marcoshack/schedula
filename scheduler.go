@@ -7,63 +7,103 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"sync"
 	"time"
-
-	"code.google.com/p/go-uuid/uuid"
 )
 
 const (
-	// TypeInMemory holds the value for scheduler type 'in-memory'
-	TypeInMemory = "in-memory"
-
 	// DefaultTickInterval is the number of seconds for scheduler's ticker
 	DefaultTickInterval = 1
 )
 
 // Scheduler is a service to schedule jobs
 type Scheduler interface {
-	Add(Job) (Job, error)
-	Get(id string) (Job, error)
-	List(size int, skip int) ([]Job, error)
-	Size() int
-	Type() string
 	Start() error
 	Stop() error
+	Add(Job) (Job, error)
+	Get(id string) (Job, error)
+	List(skip int, limit int) ([]Job, error)
+	Count() int
 }
 
 // InMemoryScheduler implements Scheduler interface using non-replicated in-memory data structure.
 // This is a example implementation and should be used only for test purposes.
 type InMemoryScheduler struct {
-	TickInterval time.Duration
+	tickInterval time.Duration
 	ticker       *time.Ticker
 	httpClient   *http.Client
-	jobs         InMemoryJobRepository
+	jobs         Repository
 	params       map[string]interface{}
-}
-
-// InMemoryJobRepository ...
-type InMemoryJobRepository struct {
-	sync.RWMutex
-	id    map[string]*Job
-	sched map[int64][]*Job
-	list  []Job
 }
 
 // InitScheduler creates a new Scheduler instance of the given type.
 // Currently acceptable values for 'schedulerType' are: "in-memory"
-func InitScheduler(schedulerType string, params map[string]interface{}) (Scheduler, error) {
-	switch schedulerType {
-	case TypeInMemory:
-		return &InMemoryScheduler{
-			TickInterval: DefaultTickInterval * time.Second,
-			params:       initParams(params),
-		}, nil
-	}
-	return nil, fmt.Errorf("scheduler: invalid scheduler type: '%s'", schedulerType)
+func InitScheduler(repo Repository, params map[string]interface{}) (Scheduler, error) {
+	return &InMemoryScheduler{
+		tickInterval: DefaultTickInterval * time.Second,
+		jobs:         repo,
+		params:       parseParams(params),
+	}, nil
 }
 
-func initParams(params map[string]interface{}) map[string]interface{} {
+// InitAndStartScheduler ...
+func InitAndStartScheduler(repo Repository, params map[string]interface{}) (Scheduler, error) {
+	scheduler, initErr := InitScheduler(repo, params)
+	if initErr != nil {
+		return nil, initErr
+	}
+
+	startErr := scheduler.Start()
+	if startErr != nil {
+		return nil, startErr
+	}
+	return scheduler, nil
+}
+
+// Start ...
+func (s *InMemoryScheduler) Start() error {
+	if s.ticker != nil {
+		return fmt.Errorf("scheduler: scheduler already started")
+	}
+	s.ticker = time.NewTicker(s.tickInterval)
+	s.httpClient = &http.Client{}
+
+	if s.params["no-tick-log"].(bool) == false {
+		log.Printf("scheduler: start ticking every %d seconds", s.tickInterval/time.Second)
+	}
+	go s.tickerLoop()
+	return nil
+}
+
+// Stop ...
+func (s *InMemoryScheduler) Stop() error {
+	if s.ticker == nil {
+		return fmt.Errorf("scheduler: scheduler wasn't started, cannot stop")
+	}
+	s.ticker.Stop()
+	return nil
+}
+
+// Add ...
+func (s *InMemoryScheduler) Add(job Job) (Job, error) {
+	return s.jobs.Add(job)
+}
+
+// Get ...
+func (s *InMemoryScheduler) Get(id string) (Job, error) {
+	return s.jobs.Get(id)
+}
+
+// List ...
+func (s *InMemoryScheduler) List(skip int, limit int) ([]Job, error) {
+	return s.jobs.List(skip, limit)
+}
+
+// Count ...
+func (s *InMemoryScheduler) Count() int {
+	return s.jobs.Count()
+}
+
+func parseParams(params map[string]interface{}) map[string]interface{} {
 	res := make(map[string]interface{})
 	defaults := make(map[string]interface{})
 	defaults["no-tick-log"] = false
@@ -77,134 +117,28 @@ func initParams(params map[string]interface{}) map[string]interface{} {
 	return params
 }
 
-// StartScheduler ...
-func StartScheduler(schedulerType string, params map[string]interface{}) (Scheduler, error) {
-	scheduler, initErr := InitScheduler(schedulerType, params)
-	if initErr != nil {
-		return nil, initErr
-	}
-
-	startErr := scheduler.Start()
-	if startErr != nil {
-		return nil, startErr
-	}
-	return scheduler, nil
-}
-
-// Add ...
-func (s *InMemoryScheduler) Add(job Job) (Job, error) {
-	job.ID = uuid.New()
-	job.Status = JobStatusPending
-
-	s.jobs.Lock()
-	defer s.jobs.Unlock()
-
-	// add to job list
-	s.jobs.list = append(s.jobs.list, job)
-	jobAddr := &s.jobs.list[len(s.jobs.list)-1]
-
-	// add to jobs map by ID
-	s.jobs.id[job.ID] = jobAddr
-
-	// add to jobs map by schedule timetamp
-	jobTimestamp, err := job.Schedule.NextTimestamp()
-	if err != nil {
-		return Job{}, err
-	}
-	if s.jobs.sched[jobTimestamp] == nil {
-		s.jobs.sched[jobTimestamp] = make([]*Job, 0)
-	}
-	s.jobs.sched[jobTimestamp] = append(s.jobs.sched[jobTimestamp], jobAddr)
-
-	return job, nil
-}
-
-// Get returns the Job associated with the given id or nil if it doensn't exist
-func (s *InMemoryScheduler) Get(id string) (Job, error) {
-	s.jobs.RLock()
-	defer s.jobs.RUnlock()
-	if s.jobs.id[id] != nil {
-		return *s.jobs.id[id], nil
-	}
-	return Job{}, nil
-}
-
-// List returns the list of scheduled jobs
-func (s *InMemoryScheduler) List(skip int, limit int) ([]Job, error) {
-	s.jobs.RLock()
-	defer s.jobs.RUnlock()
-
-	if len(s.jobs.id) == 0 || skip > len(s.jobs.id) || limit < 0 {
-		return make([]Job, 0), nil
-	}
-
-	start := skip
-	if start > len(s.jobs.list) {
-		skip = len(s.jobs.list)
-	}
-	end := skip + limit
-	if end > len(s.jobs.list) {
-		end = len(s.jobs.list)
-	}
-
-	return s.jobs.list[start:end], nil
-}
-
-// Size returns the number of active jobs in the scheduler
-func (s *InMemoryScheduler) Size() int {
-	s.jobs.RLock()
-	defer s.jobs.RUnlock()
-	return len(s.jobs.list)
-}
-
-// Type ...
-func (s *InMemoryScheduler) Type() string {
-	return "in-memory"
-}
-
-// Start ...
-func (s *InMemoryScheduler) Start() error {
-	if s.ticker != nil {
-		return fmt.Errorf("scheduler: scheduler already started")
-	}
-	s.ticker = time.NewTicker(s.TickInterval)
-	s.httpClient = &http.Client{}
-	s.jobs = InMemoryJobRepository{
-		id:    make(map[string]*Job),
-		sched: make(map[int64][]*Job),
-	}
-
-	if s.params["no-tick-log"].(bool) == false {
-		log.Printf("scheduler: start ticking every %d seconds", s.TickInterval/time.Second)
-	}
-	go s.tick()
-	return nil
-}
-
-// Stop ...
-func (s *InMemoryScheduler) Stop() error {
-	if s.ticker == nil {
-		return fmt.Errorf("scheduler: scheduler wasn't started, cannot stop")
-	}
-	s.ticker.Stop()
-	return nil
-}
-
-func (s *InMemoryScheduler) tick() {
+func (s *InMemoryScheduler) tickerLoop() {
 	for now := range s.ticker.C {
-		s.jobs.RLock()
-		schedList := s.jobs.sched[now.Unix()]
-		s.jobs.RUnlock()
-		if schedList != nil {
-			log.Printf("scheduler: executing %d callbacks at %v (%v)", len(schedList), now.Unix(), now)
-			for _, job := range schedList {
-				go s.execute(job)
-			}
+		go s.executeCallbacks(now)
+	}
+}
+
+func (s *InMemoryScheduler) executeCallbacks(now time.Time) {
+	schedList, err := s.jobs.ListBySchedule(now.Unix())
+	if err != nil {
+		log.Printf("scheduler: error retrieving job list scheduled at %v: %v", now, err)
+		return
+	}
+
+	if schedList != nil {
+		log.Printf("scheduler: executing %d callbacks scheduled at %v (%v)", len(schedList), now.Unix(), now)
+		for _, job := range schedList {
+			go s.executeCallback(job)
 		}
 	}
 }
 
-func (s *InMemoryScheduler) execute(job *Job) {
+func (s *InMemoryScheduler) executeCallback(job *Job) {
 	var body = new(bytes.Buffer)
 	encErr := json.NewEncoder(body).Encode(job)
 	if encErr != nil {
@@ -221,7 +155,7 @@ func (s *InMemoryScheduler) execute(job *Job) {
 
 	res, postErr := s.httpClient.Do(req)
 	if postErr != nil {
-		log.Printf("scheduler: error on job[ID:%s] callback: %v", job.ID, postErr)
+		log.Printf("scheduler: callback error on job[ID:%s]: %v", job.ID, postErr)
 		job.Status = JobStatusError
 		return
 	}

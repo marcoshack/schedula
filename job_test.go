@@ -9,7 +9,7 @@ import (
 
 func TestJSONMarshal(t *testing.T) {
 	var expected = []byte(`{"id":"","businessKey":"","callbackURL":"http://example.com/","data":null,"schedule":{"format":"timestamp","value":"1438948984"},"status":""}`)
-	job := aJob(1438948984)
+	job := aJobWithTimestamp(1438948984)
 
 	b, err := json.Marshal(job)
 	if err != nil {
@@ -23,14 +23,14 @@ func TestJSONMarshal(t *testing.T) {
 
 func TestNextTimestamp(t *testing.T) {
 	var expected int64 = 1438948984
-	job := aJob(expected)
+	job := aJobWithTimestamp(expected)
 	actual, err := job.Schedule.NextTimestamp()
 	if actual != expected || err != nil {
 		t.Fatalf("expected %d but got %d (error: %v)", expected, actual, err)
 	}
 }
 
-func aJob(timestamp int64) Job {
+func aJobWithTimestamp(timestamp int64) Job {
 	return Job{
 		CallbackURL: "http://example.com/",
 		Schedule: JobSchedule{
