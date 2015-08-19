@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,6 +18,9 @@ const (
 )
 
 func main() {
+	n := flag.Int("n", 10, "number of callbacks to create")
+	flag.Parse()
+
 	server := &http.Server{
 		Addr: "127.0.0.1:8088",
 	}
@@ -24,7 +28,7 @@ func main() {
 	callbackTime := time.Now().Add(5 * time.Second)
 
 	jobsCreated := 0
-	for i := 1; i <= 100; i++ {
+	for i := 1; i <= *n; i++ {
 		job := &schedula.Job{
 			CallbackURL: fmt.Sprintf("http://127.0.0.1:8088/callback/%d", i),
 			Schedule: schedula.JobSchedule{
@@ -64,13 +68,14 @@ func main() {
 	}
 
 	http.HandleFunc("/callback/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Callback received %s", r.URL.Path)
+		log.Printf("INFO: Callback received %s", r.URL.Path)
 	})
 
 	if jobsCreated > 0 {
-		log.Printf("Listening for callbacks on %s\n", server.Addr)
+		log.Printf("INFO: %d callbacks created", jobsCreated)
+		log.Printf("INFO: Listening for callbacks on %s\n", server.Addr)
 		log.Fatal(server.ListenAndServe())
 	} else {
-		log.Printf("No jobs were created, terminating.")
+		log.Printf("INFO: No jobs were created, terminating.")
 	}
 }
