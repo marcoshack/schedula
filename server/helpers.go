@@ -10,9 +10,9 @@ import (
 )
 
 // ErrorResponse ...
-func ErrorResponse(err error, w http.ResponseWriter, status int) {
-	fmt.Fprintf(w, "{\"error\":\"%s\"}", err)
+func ErrorResponse(w http.ResponseWriter, err error, status int) {
 	w.WriteHeader(status)
+	fmt.Fprintf(w, "{\"error\":\"%s\"}", err)
 }
 
 // ParseJob ...

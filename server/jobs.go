@@ -39,14 +39,14 @@ func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	jobs, err := h.scheduler.List(skip, limit)
 	if err != nil {
-		ErrorResponse(err, w, http.StatusInternalServerError)
+		ErrorResponse(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	var resBuf = new(bytes.Buffer)
 	encErr := json.NewEncoder(resBuf).Encode(jobs)
 	if encErr != nil {
-		ErrorResponse(encErr, w, http.StatusInternalServerError)
+		ErrorResponse(w, encErr, http.StatusInternalServerError)
 		return
 	}
 
@@ -60,14 +60,14 @@ func (h *JobsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	job, err := ParseJob(r)
 	if err != nil {
 		log.Printf("jobs: error parsing job: %s", err)
-		ErrorResponse(err, w, http.StatusBadRequest)
+		ErrorResponse(w, err, http.StatusBadRequest)
 		return
 	}
 
 	newJob, err := h.scheduler.Add(job)
 	if err != nil {
 		log.Printf("jobs: error scheduling job: %s", err)
-		ErrorResponse(err, w, http.StatusInternalServerError)
+		ErrorResponse(w, err, http.StatusBadRequest)
 		return
 	}
 
