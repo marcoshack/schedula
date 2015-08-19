@@ -12,25 +12,28 @@ import (
 	"github.com/marcoshack/schedula"
 )
 
-const (
-	// SchedulaURL is the URL for Schedula server's jobs resource
-	SchedulaURL = "http://localhost:8080/jobs/"
-)
-
 func main() {
-	n := flag.Int("n", 10, "number of callbacks to create")
+	numberOfCalbacks := flag.Int("n", 10, "number of callbacks to create")
+	serverPort := flag.Int("p", 8088, "HTTP port number to listen for callbacks")
+	callbackTimeDelay := flag.Int("d", 5, "delay in seconds to create callbacks")
+	serverBaseURL := flag.String("s", "http://localhost:8080/", "Schedula server base URL")
 	flag.Parse()
 
-	server := &http.Server{
-		Addr: "127.0.0.1:8088",
-	}
+	callbackDelayDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", *callbackTimeDelay))
+	callbackTime := time.Now().Add(callbackDelayDuration)
+	jobsURL := fmt.Sprintf("%sjobs/", *serverBaseURL)
+
 	client := &http.Client{}
-	callbackTime := time.Now().Add(5 * time.Second)
+
+	_, err := client.Head(jobsURL)
+	if err != nil {
+		log.Fatalf("Schedula server is not available: %v", err)
+	}
 
 	jobsCreated := 0
-	for i := 1; i <= *n; i++ {
+	for i := 1; i <= *numberOfCalbacks; i++ {
 		job := &schedula.Job{
-			CallbackURL: fmt.Sprintf("http://127.0.0.1:8088/callback/%d", i),
+			CallbackURL: fmt.Sprintf("http://127.0.0.1:%d/callback/%d", *serverPort, i),
 			Schedule: schedula.JobSchedule{
 				Format: "timestamp",
 				Value:  fmt.Sprintf("%v", callbackTime.Unix()),
@@ -44,7 +47,7 @@ func main() {
 			continue
 		}
 
-		req, reqErr := http.NewRequest("POST", SchedulaURL, body)
+		req, reqErr := http.NewRequest("POST", jobsURL, body)
 		if reqErr != nil {
 			log.Printf("ERROR: failed to create HTTP request: %v", reqErr)
 			continue
@@ -72,9 +75,14 @@ func main() {
 	})
 
 	if jobsCreated > 0 {
+		server := &http.Server{
+			Addr: fmt.Sprintf("127.0.0.1:%d", *serverPort),
+		}
+
 		log.Printf("INFO: %d callbacks created", jobsCreated)
 		log.Printf("INFO: Listening for callbacks on %s\n", server.Addr)
 		log.Fatal(server.ListenAndServe())
+
 	} else {
 		log.Printf("INFO: No jobs were created, terminating.")
 	}
