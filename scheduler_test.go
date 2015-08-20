@@ -28,7 +28,7 @@ func TestSchedulerCount(t *testing.T) {
 
 func createScheduler(t *testing.T) (Scheduler, *RepositoryMock) {
 	r := NewRepositoryMock()
-	s, e := InitAndStartScheduler(r, map[string]interface{}{"no-tick-log": true})
+	s, e := InitAndStartScheduler(r, SchedulerConfig{})
 	if e != nil {
 		t.Fatalf("failed to initialize scheduler: %s", e)
 	}

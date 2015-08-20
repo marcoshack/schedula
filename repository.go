@@ -20,17 +20,17 @@ type Repository interface {
 // NewRepository ...
 func NewRepository() (Repository, error) {
 	return &InMemoryJobRepository{
-		id:    make(map[string]*Job),
-		sched: make(map[int64][]*Job),
+		jobsByID:       make(map[string]*Job),
+		jobsBySchedule: make(map[int64][]*Job),
 	}, nil
 }
 
 // InMemoryJobRepository ...
 type InMemoryJobRepository struct {
 	sync.RWMutex
-	id    map[string]*Job
-	sched map[int64][]*Job
-	list  []Job
+	jobsByID       map[string]*Job
+	jobsBySchedule map[int64][]*Job
+	jobIndexByID   []string
 }
 
 // Add ...
@@ -42,21 +42,20 @@ func (r *InMemoryJobRepository) Add(job Job) (Job, error) {
 	defer r.Unlock()
 
 	// add to job list
-	r.list = append(r.list, job)
-	jobAddr := &r.list[len(r.list)-1]
+	r.jobIndexByID = append(r.jobIndexByID, job.ID)
 
 	// add to jobs map by ID
-	r.id[job.ID] = jobAddr
+	r.jobsByID[job.ID] = &job
 
 	// add to jobs map by schedule timetamp
 	jobTimestamp, err := job.Schedule.NextTimestamp()
 	if err != nil {
 		return Job{}, err
 	}
-	if r.sched[jobTimestamp] == nil {
-		r.sched[jobTimestamp] = make([]*Job, 0)
+	if r.jobsBySchedule[jobTimestamp] == nil {
+		r.jobsBySchedule[jobTimestamp] = make([]*Job, 0)
 	}
-	r.sched[jobTimestamp] = append(r.sched[jobTimestamp], jobAddr)
+	r.jobsBySchedule[jobTimestamp] = append(r.jobsBySchedule[jobTimestamp], &job)
 
 	return job, nil
 }
@@ -65,8 +64,8 @@ func (r *InMemoryJobRepository) Add(job Job) (Job, error) {
 func (r *InMemoryJobRepository) Get(id string) (Job, error) {
 	r.RLock()
 	defer r.RUnlock()
-	if r.id[id] != nil {
-		return *r.id[id], nil
+	if r.jobsByID[id] != nil {
+		return *r.jobsByID[id], nil
 	}
 	return Job{}, nil
 }
@@ -76,27 +75,34 @@ func (r *InMemoryJobRepository) List(skip int, limit int) ([]Job, error) {
 	r.RLock()
 	defer r.RUnlock()
 
-	if len(r.id) == 0 || skip > len(r.id) || limit < 0 {
+	// empty result
+	if len(r.jobsByID) == 0 || skip > len(r.jobsByID) || limit < 0 {
 		return make([]Job, 0), nil
 	}
 
 	start := skip
-	if start > len(r.list) {
-		skip = len(r.list)
+	if start > len(r.jobIndexByID) {
+		skip = len(r.jobIndexByID)
 	}
 	end := skip + limit
-	if end > len(r.list) {
-		end = len(r.list)
+	if end > len(r.jobIndexByID) {
+		end = len(r.jobIndexByID)
 	}
 
-	return r.list[start:end], nil
+	ids := r.jobIndexByID[start:end]
+	jobs := make([]Job, len(ids))
+	for i := 0; i < len(ids); i++ {
+		jobs[i] = *r.jobsByID[ids[i]]
+	}
+
+	return jobs, nil
 }
 
 // Count returns the number of active jobs in the scheduler
 func (r *InMemoryJobRepository) Count() int {
 	r.RLock()
 	defer r.RUnlock()
-	return len(r.list)
+	return len(r.jobIndexByID)
 }
 
 // ListBySchedule returns the list of Jobs scheduled for the given timestamp
@@ -104,7 +110,7 @@ func (r *InMemoryJobRepository) ListBySchedule(timestamp int64) ([]*Job, error) 
 	lockRequest := time.Now()
 	r.RLock()
 	lockAcquired := time.Now()
-	schedList := r.sched[timestamp]
+	schedList := r.jobsBySchedule[timestamp]
 	r.RUnlock()
 	lockReleased := time.Now()
 	lockDuration := lockReleased.Sub(lockAcquired)
