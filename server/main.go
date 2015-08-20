@@ -18,7 +18,7 @@ func main() {
 	log.Printf("Schedula Server %s", version)
 
 	serverAddr := flag.String("b", "127.0.0.1:8080", "HTTP bind address")
-	numberOfWorkers := flag.Int("w", 50, "number of workers to execute callback requests")
+	numberOfWorkers := flag.Int("w", 2, "number of workers to execute callback requests")
 	flag.Parse()
 
 	repository, err := schedula.NewRepository()

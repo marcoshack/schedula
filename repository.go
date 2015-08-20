@@ -41,13 +41,9 @@ func (r *InMemoryJobRepository) Add(job Job) (Job, error) {
 	r.Lock()
 	defer r.Unlock()
 
-	// add to job list
 	r.jobIndexByID = append(r.jobIndexByID, job.ID)
-
-	// add to jobs map by ID
 	r.jobsByID[job.ID] = &job
 
-	// add to jobs map by schedule timetamp
 	jobTimestamp, err := job.Schedule.NextTimestamp()
 	if err != nil {
 		return Job{}, err
