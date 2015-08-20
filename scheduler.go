@@ -152,7 +152,6 @@ func (s *TickerScheduler) launchCallbacks(now time.Time) {
 
 func (s *TickerScheduler) executeCallbacks(jobs chan *Job) {
 	for job := range jobs {
-		log.Printf("scheduler: job[ID:%s]: executing callback", job.ID)
 		s.executeCallback(job)
 	}
 }
@@ -178,7 +177,6 @@ func (s *TickerScheduler) executeCallback(job *Job) {
 		return
 	}
 
-	log.Printf("scheduler: job[ID:%s]: callback succeed: %s", job.ID, res.Status)
 	job.Status = JobStatusSuccess
 }
 

@@ -72,7 +72,6 @@ func (h *JobsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("jobs: job created: %s", newJob)
 	w.Header().Add("Location", fmt.Sprintf("%s%s", h.Path, newJob.ID))
 	w.WriteHeader(http.StatusCreated)
 }
