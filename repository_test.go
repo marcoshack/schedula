@@ -84,6 +84,16 @@ func TestRemove(t *testing.T) {
 	}
 }
 
+func TestCancel(t *testing.T) {
+	repo, _ := NewRepository()
+	job, _ := repo.Add(aJob())
+	repo.Cancel(job.ID)
+	updatedJob, _ := repo.Get(job.ID)
+	if updatedJob.Status != JobStatusCanceled {
+		t.Fatalf("expected job status was '%s' but got '%s'", JobStatusCanceled, updatedJob.Status)
+	}
+}
+
 func ExampleScheduler_List_ordering() {
 	repo, _ := NewRepository()
 	n := 10
