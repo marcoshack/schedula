@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"testing"
+	"time"
 )
 
 func TestJSONMarshal(t *testing.T) {
@@ -30,12 +31,27 @@ func TestNextTimestamp(t *testing.T) {
 	}
 }
 
+func aJob() Job {
+	return aJobWithTimestamp(time.Now().Unix())
+}
+
 func aJobWithTimestamp(timestamp int64) Job {
 	return Job{
 		CallbackURL: "http://example.com/",
 		Schedule: JobSchedule{
 			Format: ScheduleFormatTimestamp,
 			Value:  strconv.FormatInt(timestamp, 10),
+		},
+	}
+}
+
+func aJobWithBusinessKey(businessKey string) Job {
+	return Job{
+		CallbackURL: "http://example.com",
+		BusinessKey: businessKey,
+		Schedule: JobSchedule{
+			Format: ScheduleFormatTimestamp,
+			Value:  strconv.FormatInt(time.Now().Unix(), 10),
 		},
 	}
 }

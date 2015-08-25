@@ -99,3 +99,12 @@ func (h *JobsHandler) Find(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write(resBuf.Bytes())
 }
+
+// Delete remove the given Job ID
+func (h *JobsHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	_, err := h.repository.Cancel(id)
+	if err != nil {
+		ErrorResponse(w, err, http.StatusInternalServerError)
+	}
+}

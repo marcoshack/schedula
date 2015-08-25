@@ -5,7 +5,6 @@ import (
 	"log"
 	"strconv"
 	"testing"
-	"time"
 )
 
 func TestNewRepository(t *testing.T) {
@@ -15,29 +14,28 @@ func TestNewRepository(t *testing.T) {
 	}
 }
 
-func TestAddAndRetrieveJobs(t *testing.T) {
+func TestAdd(t *testing.T) {
 	repo, _ := NewRepository()
-	newJob, e := repo.Add(Job{
-		CallbackURL: "http://example.com",
-		Schedule: JobSchedule{
-			Format: ScheduleFormatTimestamp,
-			Value:  strconv.FormatInt(time.Now().Unix(), 10),
-		},
-	})
-
-	if e != nil {
-		t.Fatalf("failed adding a new job to scheduler: %s", e)
+	job, err := repo.Add(aJob())
+	if err != nil {
+		t.Fatalf("unable to add job: %v", err)
 	}
-	if repo.Count() != 1 {
-		t.Fatalf("invalid scheduler size, expected 1 but got %d", repo.Count())
-	}
-	job, _ := repo.Get(newJob.ID)
-	if job.ID != newJob.ID {
-		log.Print("failed retrieving job, expected a valid job but got nil")
+	if job.ID == "" {
+		t.Fatalf("invalid job ID: %s", job.ID)
 	}
 }
 
-func TestRetrieveANonExistingJob(t *testing.T) {
+func TestGet(t *testing.T) {
+	repo, _ := NewRepository()
+	newJob, _ := repo.Add(aJob())
+
+	job, _ := repo.Get(newJob.ID)
+	if job.ID != newJob.ID {
+		log.Print("unable to retrieve job, expected a valid job but got nil")
+	}
+}
+
+func TestGetNonExistingJob(t *testing.T) {
 	repo, _ := NewRepository()
 	job, _ := repo.Get("non-existing-job-id")
 	if job.ID != "" {
@@ -63,6 +61,29 @@ func TestListWithPagination(t *testing.T) {
 	}
 }
 
+func TestRemove(t *testing.T) {
+	repo, _ := NewRepository()
+	initialSize := 5
+	expectedFinalSize := 4
+	var toRemove string
+	for i := 0; i < initialSize; i++ {
+		newJob, _ := repo.Add(aJob())
+		if i == 2 {
+			toRemove = newJob.ID
+		}
+	}
+	job, err := repo.Remove(toRemove)
+	if err != nil {
+		t.Fatalf("unable to remove job: %v", err)
+	}
+	if job.ID != toRemove {
+		t.Fatalf("expected removed job to have ID '%s' but got '%s'", toRemove, job.ID)
+	}
+	if repo.Count() != expectedFinalSize {
+		t.Fatalf("expected repo final size to be %d but got %d", expectedFinalSize, repo.Count())
+	}
+}
+
 func ExampleScheduler_List_ordering() {
 	repo, _ := NewRepository()
 	n := 10
@@ -75,17 +96,6 @@ func ExampleScheduler_List_ordering() {
 	fmt.Println(keys)
 	// Output:
 	// [0 1 2 3 4 5 6 7 8 9]
-}
-
-func aJobWithBusinessKey(businessKey string) Job {
-	return Job{
-		CallbackURL: "http://example.com",
-		BusinessKey: businessKey,
-		Schedule: JobSchedule{
-			Format: ScheduleFormatTimestamp,
-			Value:  strconv.FormatInt(time.Now().Unix(), 10),
-		},
-	}
 }
 
 func addJobs(repo Repository, n int) int {

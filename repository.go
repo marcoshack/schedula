@@ -13,6 +13,8 @@ type Repository interface {
 	Add(Job) (Job, error)
 	Get(id string) (Job, error)
 	List(skip int, limit int) ([]Job, error)
+	Remove(jobID string) (Job, error)
+	Cancel(jobID string) (Job, error)
 	Count() int
 	ListBySchedule(timestamp int64) ([]*Job, error)
 }
@@ -44,26 +46,31 @@ func (r *InMemoryJobRepository) Add(job Job) (Job, error) {
 	r.jobIndexByID = append(r.jobIndexByID, job.ID)
 	r.jobsByID[job.ID] = &job
 
-	jobTimestamp, err := job.Schedule.NextTimestamp()
+	jobTime, err := job.Schedule.NextTimestamp()
 	if err != nil {
 		return Job{}, err
 	}
-	if r.jobsBySchedule[jobTimestamp] == nil {
-		r.jobsBySchedule[jobTimestamp] = make([]*Job, 0)
+	if r.jobsBySchedule[jobTime] == nil {
+		r.jobsBySchedule[jobTime] = make([]*Job, 0)
 	}
-	r.jobsBySchedule[jobTimestamp] = append(r.jobsBySchedule[jobTimestamp], &job)
+	r.jobsBySchedule[jobTime] = append(r.jobsBySchedule[jobTime], &job)
 
 	return job, nil
 }
 
 // Get returns the Job associated with the given id or nil if it doensn't exist
 func (r *InMemoryJobRepository) Get(id string) (Job, error) {
-	r.RLock()
-	defer r.RUnlock()
-	if r.jobsByID[id] != nil {
-		return *r.jobsByID[id], nil
+	job, _ := r.get(id)
+	if job != nil {
+		return *job, nil
 	}
 	return Job{}, nil
+}
+
+func (r *InMemoryJobRepository) get(id string) (*Job, error) {
+	r.RLock()
+	defer r.RUnlock()
+	return r.jobsByID[id], nil
 }
 
 // List returns the list of scheduled jobs
@@ -116,4 +123,59 @@ func (r *InMemoryJobRepository) ListBySchedule(timestamp int64) ([]*Job, error) 
 		log.Printf("scheduler: jobs lock duration: %fs, acquiring: %fs", lockDuration.Seconds(), lockAcquiring.Seconds())
 	}
 	return schedList, nil
+}
+
+// Remove ...
+func (r *InMemoryJobRepository) Remove(jobID string) (Job, error) {
+	job, err := r.get(jobID)
+	if err != nil {
+		return *job, err
+	}
+
+	jobTimestamp, err := job.Schedule.NextTimestamp()
+	if err != nil {
+		return *job, err
+	}
+
+	r.Lock()
+	defer r.Unlock()
+
+	// remove from r.jobsByID
+	delete(r.jobsByID, jobID)
+
+	// rebuild r.jobIndexByID
+	// TODO use append to rebuild
+	newJobIndex := make([]string, len(r.jobIndexByID)-1)
+	for i, j := 0, 0; i < len(newJobIndex); i, j = i+1, j+1 {
+		if r.jobIndexByID[i] == jobID {
+			j++
+		}
+		newJobIndex[i] = r.jobIndexByID[j]
+	}
+	r.jobIndexByID = newJobIndex
+
+	// remove from r.jobsBySchedule
+	// TODO use append to rebuild
+	scheduledJobs := r.jobsBySchedule[jobTimestamp]
+	newScheduledJobs := make([]*Job, len(scheduledJobs)-1)
+	for i, j := 0, 0; i < len(newScheduledJobs); i, j = i+1, j+1 {
+		if scheduledJobs[i].ID == jobID {
+			scheduledJobs[j] = nil
+			j++
+		}
+		newScheduledJobs[i] = scheduledJobs[j]
+	}
+	r.jobsBySchedule[jobTimestamp] = newScheduledJobs
+
+	return *job, nil
+}
+
+// Cancel changes job status to JobStatusCanceled
+func (r *InMemoryJobRepository) Cancel(jobID string) (Job, error) {
+	job, err := r.get(jobID)
+	if err != nil {
+		return Job{}, err
+	}
+	job.Status = JobStatusCanceled
+	return *job, nil
 }

@@ -56,6 +56,16 @@ func (r *RepositoryMock) ListBySchedule(timestamp int64) ([]*Job, error) {
 	return make([]*Job, 0), nil
 }
 
+func (r *RepositoryMock) Remove(jobID string) (Job, error) {
+	r.inc("Remove")
+	return Job{ID: jobID}, nil
+}
+
+func (r *RepositoryMock) Cancel(jobID string) (Job, error) {
+	r.inc("Cancel")
+	return Job{ID: jobID}, nil
+}
+
 func (r *RepositoryMock) inc(method string) {
 	r.counters[method]++
 }

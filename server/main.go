@@ -28,6 +28,7 @@ func main() {
 	router.HandleFunc("/jobs/", jobsHandler.List).Methods("GET")
 	router.HandleFunc("/jobs/", jobsHandler.Create).Methods("POST")
 	router.HandleFunc("/jobs/{id}", jobsHandler.Find).Methods("GET")
+	router.HandleFunc("/jobs/{id}", jobsHandler.Delete).Methods("DELETE")
 
 	log.Printf("Listening on %s", *serverAddr)
 	log.Fatal(http.ListenAndServe(*serverAddr, router))

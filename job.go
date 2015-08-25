@@ -20,6 +20,9 @@ const (
 
 	// JobStatusFail ...
 	JobStatusFail = "fail"
+
+	// JobStatusCanceled ...
+	JobStatusCanceled = "canceled"
 )
 
 // Job ...
@@ -30,6 +33,11 @@ type Job struct {
 	Data        map[string]string `json:"data"`
 	Schedule    JobSchedule       `json:"schedule"`
 	Status      string            `json:"status"`
+}
+
+// IsExecutable returns whether the job callback should be executed
+func (j *Job) IsExecutable() bool {
+	return j.Status != JobStatusSuccess && j.Status != JobStatusCanceled
 }
 
 // JobSchedule ...

@@ -103,10 +103,12 @@ func (s *TickerScheduler) launchCallbacks(now time.Time) {
 		return
 	}
 
-	if jobs != nil {
+	if jobs != nil && len(jobs) != 0 {
 		log.Printf("scheduler: launching %d callbacks scheduled at %v (%v)", len(jobs), now.Unix(), now)
 		for _, j := range jobs {
-			s.callbackChannel <- j
+			if j.IsExecutable() {
+				s.callbackChannel <- j
+			}
 		}
 		log.Printf("scheduler: all callbacks sheduled at %v (%v) were launched", now.Unix(), now)
 	}
