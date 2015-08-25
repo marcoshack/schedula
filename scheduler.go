@@ -21,10 +21,6 @@ const (
 type Scheduler interface {
 	Start() error
 	Stop() error
-	Add(Job) (Job, error)
-	Get(id string) (Job, error)
-	List(skip int, limit int) ([]Job, error)
-	Count() int
 }
 
 // SchedulerConfig holds Scheduler configuration parameters
@@ -92,40 +88,6 @@ func (s *TickerScheduler) Stop() error {
 	}
 	s.ticker.Stop()
 	return nil
-}
-
-// Add ...
-func (s *TickerScheduler) Add(job Job) (Job, error) {
-	return s.jobs.Add(job)
-}
-
-// Get ...
-func (s *TickerScheduler) Get(id string) (Job, error) {
-	return s.jobs.Get(id)
-}
-
-// List ...
-func (s *TickerScheduler) List(skip int, limit int) ([]Job, error) {
-	return s.jobs.List(skip, limit)
-}
-
-// Count ...
-func (s *TickerScheduler) Count() int {
-	return s.jobs.Count()
-}
-
-func parseParams(params map[string]interface{}) map[string]interface{} {
-	res := make(map[string]interface{})
-	defaults := make(map[string]interface{})
-	defaults["no-tick-log"] = false
-	for key, defaultValue := range defaults {
-		if params[key] != nil {
-			res[key] = params[key]
-		} else {
-			params[key] = defaultValue
-		}
-	}
-	return params
 }
 
 func (s *TickerScheduler) tickerLoop() {

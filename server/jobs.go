@@ -19,8 +19,8 @@ const (
 
 // JobsHandler is a HTTP handler to retrieve and manipulate jobs
 type JobsHandler struct {
-	Path      string
-	scheduler schedula.Scheduler
+	path       string
+	repository schedula.Repository
 }
 
 func (h *JobsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +38,7 @@ func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 	skip := ParseIntParam(r, "skip", 0)
 	limit := ParseIntParam(r, "limit", MaxPageSize)
 
-	jobs, err := h.scheduler.List(skip, limit)
+	jobs, err := h.repository.List(skip, limit)
 	if err != nil {
 		ErrorResponse(w, err, http.StatusInternalServerError)
 		return
@@ -52,7 +52,7 @@ func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Add("Page-Count", strconv.Itoa(len(jobs)))
-	w.Header().Add("Total-Count", strconv.Itoa(h.scheduler.Count()))
+	w.Header().Add("Total-Count", strconv.Itoa(h.repository.Count()))
 	w.Write(resBuf.Bytes())
 }
 
@@ -65,21 +65,21 @@ func (h *JobsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newJob, err := h.scheduler.Add(job)
+	newJob, err := h.repository.Add(job)
 	if err != nil {
 		log.Printf("jobs: error scheduling job: %s", err)
 		ErrorResponse(w, err, http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Add("Location", fmt.Sprintf("%s%s", h.Path, newJob.ID))
+	w.Header().Add("Location", fmt.Sprintf("%s%s", h.path, newJob.ID))
 	w.WriteHeader(http.StatusCreated)
 }
 
 // Find retrieves the job specified by the 'id' path parameter
 func (h *JobsHandler) Find(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	job, err := h.scheduler.Get(id)
+	job, err := h.repository.Get(id)
 
 	if err != nil {
 		ErrorResponse(w, err, http.StatusInternalServerError)

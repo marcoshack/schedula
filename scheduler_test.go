@@ -2,30 +2,6 @@ package schedula
 
 import "testing"
 
-func TestSchedulerAdd(t *testing.T) {
-	s, r := createScheduler(t)
-	s.Add(Job{})
-	assertReposityCall("Add", 1, r, t)
-}
-
-func TestSchedulerList(t *testing.T) {
-	s, r := createScheduler(t)
-	s.List(0, 10)
-	assertReposityCall("List", 1, r, t)
-}
-
-func TestSchedulerGet(t *testing.T) {
-	s, r := createScheduler(t)
-	s.Get("foo")
-	assertReposityCall("Get", 1, r, t)
-}
-
-func TestSchedulerCount(t *testing.T) {
-	s, r := createScheduler(t)
-	s.Count()
-	assertReposityCall("Count", 1, r, t)
-}
-
 func createScheduler(t *testing.T) (Scheduler, *RepositoryMock) {
 	r := NewRepositoryMock()
 	s, e := InitAndStartScheduler(r, SchedulerConfig{})
