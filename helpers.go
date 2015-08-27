@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-
-	"github.com/marcoshack/schedula"
 )
 
 // ErrorResponse ...
@@ -16,8 +14,8 @@ func ErrorResponse(w http.ResponseWriter, err error, status int) {
 }
 
 // ParseJob ...
-func ParseJob(r *http.Request) (schedula.Job, error) {
-	var job schedula.Job
+func ParseJob(r *http.Request) (Job, error) {
+	var job Job
 	dec := json.NewDecoder(r.Body)
 	return job, dec.Decode(&job)
 }

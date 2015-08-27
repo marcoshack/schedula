@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/marcoshack/schedula"
 )
 
 const (
@@ -36,16 +35,16 @@ func main() {
 	scheduler.Stop()
 }
 
-func initRepository() schedula.Repository {
-	repository, repoErr := schedula.NewRepository()
+func initRepository() Repository {
+	repository, repoErr := NewRepository()
 	if repoErr != nil {
 		log.Fatalf("schedula: error initializing repository: %v", repoErr)
 	}
 	return repository
 }
 
-func initScheduler(repository schedula.Repository, nWorkers int) schedula.Scheduler {
-	scheduler, err := schedula.InitAndStartScheduler(repository, schedula.SchedulerConfig{NumberOfWorkers: nWorkers})
+func initScheduler(repository Repository, nWorkers int) Scheduler {
+	scheduler, err := InitAndStartScheduler(repository, SchedulerConfig{NumberOfWorkers: nWorkers})
 	if err != nil {
 		log.Fatalf("schedula: error initializing scheduler: %v", err)
 	}

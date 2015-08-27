@@ -1,4 +1,4 @@
-package schedula
+package main
 
 import (
 	"log"

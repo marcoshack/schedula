@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	"github.com/marcoshack/schedula"
 )
 
 const (
@@ -20,7 +19,7 @@ const (
 // JobsHandler is a HTTP handler to retrieve and manipulate jobs
 type JobsHandler struct {
 	path       string
-	repository schedula.Repository
+	repository Repository
 }
 
 func (h *JobsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
