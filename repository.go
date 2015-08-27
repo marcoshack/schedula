@@ -13,7 +13,7 @@ type Repository interface {
 	List(skip int, limit int) ([]Job, error)
 	Remove(jobID string) (Job, error)
 	Cancel(jobID string) (Job, error)
-	SetStatus(jobID string, status string) (Job, error)
+	UpdateStatus(jobID string, status string) (Job, error)
 	Count() int
 	ListBySchedule(timestamp int64) ([]Job, error)
 }
@@ -176,8 +176,8 @@ func (r *InMemoryJobRepository) Cancel(jobID string) (Job, error) {
 	return *job, nil
 }
 
-// SetStatus changes the status of the job identified by the given ID
-func (r *InMemoryJobRepository) SetStatus(jobID string, status string) (Job, error) {
+// UpdateStatus changes the status of the job identified by the given ID
+func (r *InMemoryJobRepository) UpdateStatus(jobID string, status string) (Job, error) {
 	job, err := r.get(jobID)
 	if err != nil {
 		return Job{}, err

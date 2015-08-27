@@ -67,7 +67,7 @@ func (r *RepositoryMock) Cancel(jobID string) (Job, error) {
 	return Job{ID: jobID}, nil
 }
 
-func (r *RepositoryMock) SetStatus(jobID string, status string) (Job, error) {
+func (r *RepositoryMock) UpdateStatus(jobID string, status string) (Job, error) {
 	r.inc("SetStatus")
 	return Job{ID: jobID}, nil
 }
@@ -84,6 +84,10 @@ func NewCallbackExecutorMock() *CallbackExecutorMock {
 	return &CallbackExecutorMock{counters: make(map[string]int)}
 }
 
-func (e *CallbackExecutorMock) Execute(job Job) (Job, error) {
-	return Job{}, nil
+func (e *CallbackExecutorMock) Execute(job Job) error {
+	return nil
+}
+
+func (e *CallbackExecutorMock) inc(method string) {
+	e.counters[method]++
 }

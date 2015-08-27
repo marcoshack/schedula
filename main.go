@@ -47,7 +47,7 @@ func initRepository() Repository {
 }
 
 func initCallbackExecutor(repository Repository) CallbackExecutor {
-	executor, err := NewCallbackExecutor(repository)
+	executor, err := NewCallbackExecutor()
 	if err != nil {
 		log.Fatalf("schedula: error initializing callback executor: %v", err)
 	}

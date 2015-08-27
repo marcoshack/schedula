@@ -112,8 +112,15 @@ func (s *TickerScheduler) publishJobs(now time.Time) {
 
 func (s *TickerScheduler) executeJobs(jobs chan Job) {
 	for job := range jobs {
-		if job, err := s.callbackExecutor.Execute(job); err != nil {
+		var status string
+		if err := s.callbackExecutor.Execute(job); err == nil {
+			status = JobStatusSuccess
+		} else {
+			status = JobStatusError
 			log.Printf("scheduler: job[ID:%s]: error executing callback: %v", job.ID, err)
+		}
+		if _, err := s.jobs.UpdateStatus(job.ID, status); err != nil {
+			log.Printf("scheduler: job[ID:%s]: error updating job status: %v", job.ID, err)
 		}
 	}
 }

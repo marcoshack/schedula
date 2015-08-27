@@ -18,9 +18,6 @@ const (
 	// JobStatusError ...
 	JobStatusError = "error"
 
-	// JobStatusFail ...
-	JobStatusFail = "fail"
-
 	// JobStatusCanceled ...
 	JobStatusCanceled = "canceled"
 )

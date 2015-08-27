@@ -94,7 +94,7 @@ func TestCancel(t *testing.T) {
 func TestSetStatus(t *testing.T) {
 	repo, _ := NewRepository()
 	job, _ := repo.Add(aJob())
-	repo.SetStatus(job.ID, JobStatusError)
+	repo.UpdateStatus(job.ID, JobStatusError)
 	assertStatus(t, repo, job.ID, JobStatusError)
 }
 

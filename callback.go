@@ -9,13 +9,12 @@ import (
 
 // CallbackExecutor is responsible for executing job's callback
 type CallbackExecutor interface {
-	Execute(Job) (Job, error)
+	Execute(Job) error
 }
 
 // NewCallbackExecutor returns an instance of CallbackExecutor
-func NewCallbackExecutor(repo Repository) (CallbackExecutor, error) {
+func NewCallbackExecutor() (CallbackExecutor, error) {
 	return &SynchronousCallbackExecutor{
-		repository: repo,
 		httpClient: &http.Client{},
 	}, nil
 }
@@ -27,33 +26,22 @@ type SynchronousCallbackExecutor struct {
 }
 
 // Execute ...
-func (s *SynchronousCallbackExecutor) Execute(job Job) (Job, error) {
-	var newJobStatus string
-
+func (s *SynchronousCallbackExecutor) Execute(job Job) error {
 	req, err := s.createCallbackRequest(job)
 	if err != nil {
-		newJobStatus = JobStatusError
-		return Job{}, err
+		return err
 	}
 
 	res, err := s.httpClient.Do(req)
 	if err != nil {
-		newJobStatus = JobStatusError
-		return Job{}, err
+		return err
 	}
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusAccepted {
-		newJobStatus = JobStatusFail
-		return Job{}, fmt.Errorf("invalid callback response: %s", res.Status)
+		return fmt.Errorf("invalid callback response, expect 200 OK or 202 Accepted but got %s", res.Status)
 	}
 
-	newJobStatus = JobStatusSuccess
-	updatedJob, err := s.repository.SetStatus(job.ID, newJobStatus)
-	if err != nil {
-		return updatedJob, fmt.Errorf("unable to update job status to '%s': %v", newJobStatus, err)
-	}
-	
-	return updatedJob, nil
+	return nil
 }
 
 func (s *SynchronousCallbackExecutor) createCallbackRequest(job Job) (*http.Request, error) {
