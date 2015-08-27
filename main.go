@@ -15,7 +15,7 @@ const (
 
 func main() {
 	log.Printf("Schedula Server %s", version)
-	bindAddr := flag.String("b", "127.0.0.1", "IP `address` to bind")
+	bindAddr := flag.String("b", "0.0.0.0", "IP `address` to bind")
 	bindPort := flag.Int("p", 8080, "TCP `port` number to bind")
 	nWorkers := flag.Int("w", 2, "number of `workers` to execute callback requests")
 	flag.Parse()
