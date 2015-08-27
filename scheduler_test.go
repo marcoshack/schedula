@@ -4,9 +4,10 @@ import "testing"
 
 func createScheduler(t *testing.T) (Scheduler, *RepositoryMock) {
 	r := NewRepositoryMock()
-	s, e := InitAndStartScheduler(r, SchedulerConfig{})
-	if e != nil {
-		t.Fatalf("failed to initialize scheduler: %s", e)
+	e := NewCallbackExecutorMock()
+	s, err := InitAndStartScheduler(r, e, SchedulerConfig{})
+	if err != nil {
+		t.Fatalf("failed to initialize scheduler: %v", err)
 	}
 	return s, r
 }
@@ -52,8 +53,8 @@ func (r *RepositoryMock) Count() int {
 	return r.counters["Count"]
 }
 
-func (r *RepositoryMock) ListBySchedule(timestamp int64) ([]*Job, error) {
-	return make([]*Job, 0), nil
+func (r *RepositoryMock) ListBySchedule(timestamp int64) ([]Job, error) {
+	return make([]Job, 0), nil
 }
 
 func (r *RepositoryMock) Remove(jobID string) (Job, error) {
@@ -66,6 +67,23 @@ func (r *RepositoryMock) Cancel(jobID string) (Job, error) {
 	return Job{ID: jobID}, nil
 }
 
+func (r *RepositoryMock) SetStatus(jobID string, status string) (Job, error) {
+	r.inc("SetStatus")
+	return Job{ID: jobID}, nil
+}
+
 func (r *RepositoryMock) inc(method string) {
 	r.counters[method]++
+}
+
+type CallbackExecutorMock struct {
+	counters map[string]int
+}
+
+func NewCallbackExecutorMock() *CallbackExecutorMock {
+	return &CallbackExecutorMock{counters: make(map[string]int)}
+}
+
+func (e *CallbackExecutorMock) Execute(job Job) (Job, error) {
+	return Job{}, nil
 }

@@ -1,1 +1,1 @@
-web: schedula -b 0.0.0.0:$PORT
+web: schedula -p $PORT

@@ -1,9 +1,7 @@
 package main
 
 import (
-	"log"
 	"sync"
-	"time"
 
 	"github.com/marcoshack/schedula/Godeps/_workspace/src/code.google.com/p/go-uuid/uuid"
 )
@@ -15,8 +13,9 @@ type Repository interface {
 	List(skip int, limit int) ([]Job, error)
 	Remove(jobID string) (Job, error)
 	Cancel(jobID string) (Job, error)
+	SetStatus(jobID string, status string) (Job, error)
 	Count() int
-	ListBySchedule(timestamp int64) ([]*Job, error)
+	ListBySchedule(timestamp int64) ([]Job, error)
 }
 
 // NewRepository ...
@@ -109,20 +108,17 @@ func (r *InMemoryJobRepository) Count() int {
 }
 
 // ListBySchedule returns the list of Jobs scheduled for the given timestamp
-func (r *InMemoryJobRepository) ListBySchedule(timestamp int64) ([]*Job, error) {
-	lockRequest := time.Now()
+func (r *InMemoryJobRepository) ListBySchedule(timestamp int64) ([]Job, error) {
 	r.RLock()
-	lockAcquired := time.Now()
+	defer r.RUnlock()
 	schedList := r.jobsBySchedule[timestamp]
-	r.RUnlock()
-	lockReleased := time.Now()
-	lockDuration := lockReleased.Sub(lockAcquired)
-	lockAcquiring := lockAcquired.Sub(lockRequest)
 
-	if lockDuration > 1*time.Millisecond || lockAcquiring > 1*time.Millisecond {
-		log.Printf("scheduler: jobs lock duration: %fs, acquiring: %fs", lockDuration.Seconds(), lockAcquiring.Seconds())
+	res := make([]Job, len(schedList))
+	for i := 0; i < len(res); i++ {
+		res[i] = *schedList[i]
 	}
-	return schedList, nil
+
+	return res, nil
 }
 
 // Remove ...
@@ -177,5 +173,15 @@ func (r *InMemoryJobRepository) Cancel(jobID string) (Job, error) {
 		return Job{}, err
 	}
 	job.Status = JobStatusCanceled
+	return *job, nil
+}
+
+// SetStatus changes the status of the job identified by the given ID
+func (r *InMemoryJobRepository) SetStatus(jobID string, status string) (Job, error) {
+	job, err := r.get(jobID)
+	if err != nil {
+		return Job{}, err
+	}
+	job.Status = status
 	return *job, nil
 }

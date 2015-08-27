@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -14,37 +15,47 @@ const (
 
 func main() {
 	log.Printf("Schedula Server %s", version)
-
-	serverAddr := flag.String("b", "127.0.0.1:8080", "HTTP bind `address`")
-	nWorkers := flag.Int("w", 2, "`number` of workers to execute callback requests")
+	bindAddr := flag.String("b", "127.0.0.1", "IP `address` to bind")
+	bindPort := flag.Int("p", 8080, "TCP `port` number to bind")
+	nWorkers := flag.Int("w", 2, "number of `workers` to execute callback requests")
 	flag.Parse()
 
 	repository := initRepository()
-	scheduler := initScheduler(repository, *nWorkers)
-	jobsHandler := &JobsHandler{repository: repository, path: "/jobs/"}
+	executor := initCallbackExecutor(repository)
+	scheduler := initScheduler(repository, executor, *nWorkers)
 
+	jobs := &JobsHandler{repository: repository, path: "/jobs/"}
 	router := mux.NewRouter()
-	router.HandleFunc("/jobs/", jobsHandler.List).Methods("GET")
-	router.HandleFunc("/jobs/", jobsHandler.Create).Methods("POST")
-	router.HandleFunc("/jobs/{id}", jobsHandler.Find).Methods("GET")
-	router.HandleFunc("/jobs/{id}", jobsHandler.Delete).Methods("DELETE")
+	router.HandleFunc("/jobs/", jobs.List).Methods("GET")
+	router.HandleFunc("/jobs/", jobs.Create).Methods("POST")
+	router.HandleFunc("/jobs/{id}", jobs.Find).Methods("GET")
+	router.HandleFunc("/jobs/{id}", jobs.Delete).Methods("DELETE")
 
-	log.Printf("Listening on %s", *serverAddr)
-	log.Fatal(http.ListenAndServe(*serverAddr, router))
+	serverAddr := fmt.Sprintf("%s:%d", *bindAddr, *bindPort)
+	log.Printf("Listening on %s", serverAddr)
+	log.Fatal(http.ListenAndServe(serverAddr, router))
 
 	scheduler.Stop()
 }
 
 func initRepository() Repository {
-	repository, repoErr := NewRepository()
-	if repoErr != nil {
-		log.Fatalf("schedula: error initializing repository: %v", repoErr)
+	repository, err := NewRepository()
+	if err != nil {
+		log.Fatalf("schedula: error initializing repository: %v", err)
 	}
 	return repository
 }
 
-func initScheduler(repository Repository, nWorkers int) Scheduler {
-	scheduler, err := InitAndStartScheduler(repository, SchedulerConfig{NumberOfWorkers: nWorkers})
+func initCallbackExecutor(repository Repository) CallbackExecutor {
+	executor, err := NewCallbackExecutor(repository)
+	if err != nil {
+		log.Fatalf("schedula: error initializing callback executor: %v", err)
+	}
+	return executor
+}
+
+func initScheduler(repository Repository, executor CallbackExecutor, nWorkers int) Scheduler {
+	scheduler, err := InitAndStartScheduler(repository, executor, SchedulerConfig{NumberOfWorkers: nWorkers})
 	if err != nil {
 		log.Fatalf("schedula: error initializing scheduler: %v", err)
 	}

@@ -1,11 +1,8 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"time"
 )
 
@@ -33,28 +30,28 @@ type SchedulerConfig struct {
 type TickerScheduler struct {
 	Config SchedulerConfig
 
-	tickInterval    time.Duration
-	ticker          *time.Ticker
-	httpClient      *http.Client
-	jobs            Repository
-	callbackChannel chan *Job
+	tickInterval     time.Duration
+	ticker           *time.Ticker
+	jobs             Repository
+	callbackExecutor CallbackExecutor
+	callbackChannel  chan Job
 }
 
 // InitScheduler creates a new Scheduler instance of the given type.
 // Currently acceptable values for 'schedulerType' are: "in-memory"
-func InitScheduler(repo Repository, config SchedulerConfig) (Scheduler, error) {
+func InitScheduler(repo Repository, executor CallbackExecutor, config SchedulerConfig) (Scheduler, error) {
 	return &TickerScheduler{
-		Config:          config,
-		jobs:            repo,
-		httpClient:      &http.Client{},
-		tickInterval:    DefaultTickInterval * time.Second,
-		callbackChannel: make(chan *Job, 10000),
+		Config:           config,
+		jobs:             repo,
+		callbackExecutor: executor,
+		tickInterval:     DefaultTickInterval * time.Second,
+		callbackChannel:  make(chan Job, 10000),
 	}, nil
 }
 
 // InitAndStartScheduler ...
-func InitAndStartScheduler(repo Repository, config SchedulerConfig) (Scheduler, error) {
-	scheduler, initErr := InitScheduler(repo, config)
+func InitAndStartScheduler(repo Repository, executor CallbackExecutor, config SchedulerConfig) (Scheduler, error) {
+	scheduler, initErr := InitScheduler(repo, executor, config)
 	if initErr != nil {
 		return nil, initErr
 	}
@@ -113,48 +110,10 @@ func (s *TickerScheduler) publishJobs(now time.Time) {
 	}
 }
 
-func (s *TickerScheduler) executeJobs(jobs chan *Job) {
+func (s *TickerScheduler) executeJobs(jobs chan Job) {
 	for job := range jobs {
-		s.execute(job)
+		if job, err := s.callbackExecutor.Execute(job); err != nil {
+			log.Printf("scheduler: job[ID:%s]: error executing callback: %v", job.ID, err)
+		}
 	}
-}
-
-func (s *TickerScheduler) execute(job *Job) {
-	req, reqErr := s.createCallbackRequest(job.CallbackURL, job)
-	if reqErr != nil {
-		log.Printf("scheduler: job[ID:%s]: error creating callback request: %v", job.ID, reqErr)
-		job.Status = JobStatusError
-		return
-	}
-
-	res, postErr := s.httpClient.Do(req)
-	if postErr != nil {
-		log.Printf("scheduler: job[ID:%s]: callback error: %v", job.ID, postErr)
-		job.Status = JobStatusError
-		return
-	}
-
-	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusAccepted {
-		log.Printf("scheduler: job[ID:%s]: callback failed: %s", job.ID, res.Status)
-		job.Status = JobStatusFail
-		return
-	}
-
-	job.Status = JobStatusSuccess
-}
-
-func (s *TickerScheduler) createCallbackRequest(urlStr string, job *Job) (*http.Request, error) {
-	var body = new(bytes.Buffer)
-	encErr := json.NewEncoder(body).Encode(job)
-	if encErr != nil {
-		return nil, fmt.Errorf("unable to encode request body: %v", encErr)
-	}
-
-	req, err := http.NewRequest("POST", urlStr, body)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "schedula")
-	req.Header.Set("Content-Type", "application/json")
-	return req, nil
 }

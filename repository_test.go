@@ -88,10 +88,14 @@ func TestCancel(t *testing.T) {
 	repo, _ := NewRepository()
 	job, _ := repo.Add(aJob())
 	repo.Cancel(job.ID)
-	updatedJob, _ := repo.Get(job.ID)
-	if updatedJob.Status != JobStatusCanceled {
-		t.Fatalf("expected job status was '%s' but got '%s'", JobStatusCanceled, updatedJob.Status)
-	}
+	assertStatus(t, repo, job.ID, JobStatusCanceled)
+}
+
+func TestSetStatus(t *testing.T) {
+	repo, _ := NewRepository()
+	job, _ := repo.Add(aJob())
+	repo.SetStatus(job.ID, JobStatusError)
+	assertStatus(t, repo, job.ID, JobStatusError)
 }
 
 func ExampleScheduler_List_ordering() {
@@ -113,4 +117,11 @@ func addJobs(repo Repository, n int) int {
 		repo.Add(aJobWithBusinessKey(strconv.Itoa(i)))
 	}
 	return n
+}
+
+func assertStatus(t *testing.T, repo Repository, jobID string, expectedStatus string) {
+	updatedJob, _ := repo.Get(jobID)
+	if updatedJob.Status != expectedStatus {
+		t.Fatalf("expected job status was '%s' but got '%s'", expectedStatus, updatedJob.Status)
+	}
 }
