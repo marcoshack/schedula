@@ -74,7 +74,7 @@ func (s *TickerScheduler) Start() error {
 	s.ticker = time.NewTicker(s.tickInterval)
 
 	for i := 0; i < s.Config.NumberOfWorkers; i++ {
-		go s.executeCallbacks(s.callbackChannel)
+		go s.executeJobs(s.callbackChannel)
 	}
 
 	go s.tickerLoop()
@@ -92,11 +92,11 @@ func (s *TickerScheduler) Stop() error {
 
 func (s *TickerScheduler) tickerLoop() {
 	for now := range s.ticker.C {
-		go s.launchCallbacks(now)
+		go s.publishJobs(now)
 	}
 }
 
-func (s *TickerScheduler) launchCallbacks(now time.Time) {
+func (s *TickerScheduler) publishJobs(now time.Time) {
 	jobs, err := s.jobs.ListBySchedule(now.Unix())
 	if err != nil {
 		log.Printf("scheduler: error retrieving job list scheduled at %v: %v", now, err)
@@ -105,22 +105,21 @@ func (s *TickerScheduler) launchCallbacks(now time.Time) {
 
 	if jobs != nil && len(jobs) != 0 {
 		log.Printf("scheduler: launching %d callbacks scheduled at %v (%v)", len(jobs), now.Unix(), now)
-		for _, j := range jobs {
-			if j.IsExecutable() {
-				s.callbackChannel <- j
+		for _, job := range jobs {
+			if job.IsExecutable() {
+				s.callbackChannel <- job
 			}
 		}
-		log.Printf("scheduler: all callbacks sheduled at %v (%v) were launched", now.Unix(), now)
 	}
 }
 
-func (s *TickerScheduler) executeCallbacks(jobs chan *Job) {
+func (s *TickerScheduler) executeJobs(jobs chan *Job) {
 	for job := range jobs {
-		s.executeCallback(job)
+		s.execute(job)
 	}
 }
 
-func (s *TickerScheduler) executeCallback(job *Job) {
+func (s *TickerScheduler) execute(job *Job) {
 	req, reqErr := s.createCallbackRequest(job.CallbackURL, job)
 	if reqErr != nil {
 		log.Printf("scheduler: job[ID:%s]: error creating callback request: %v", job.ID, reqErr)
