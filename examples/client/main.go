@@ -13,10 +13,10 @@ import (
 )
 
 func main() {
-	numberOfCalbacks := flag.Int("n", 10, "number of callbacks to create")
-	serverPort := flag.Int("p", 8088, "HTTP port number to listen for callbacks")
-	callbackTimeDelay := flag.Int("d", 5, "delay in seconds to create callbacks")
-	serverBaseURL := flag.String("s", "http://localhost:8080/", "Schedula server base URL")
+	numberOfCalbacks := flag.Int("n", 10, "`number` of callbacks to create")
+	serverPort := flag.Int("p", 8088, "HTTP `port` number to listen for callbacks")
+	callbackTimeDelay := flag.Int("d", 5, "delay in `seconds` to create callbacks")
+	serverBaseURL := flag.String("s", "http://localhost:8080/", "Schedula server base `URL`")
 	flag.Parse()
 
 	callbackDelayDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", *callbackTimeDelay))
