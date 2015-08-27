@@ -8,9 +8,19 @@ import (
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/marcoshack/schedula"
 )
+
+// Job ...
+type Job struct {
+	CallbackURL string      `json:"callbackURL"`
+	Schedule    JobSchedule `json:"schedule"`
+}
+
+// JobSchedule ...
+type JobSchedule struct {
+	Format string `json:"format"`
+	Value  string `json:"value"`
+}
 
 func main() {
 	numberOfCalbacks := flag.Int("n", 10, "`number` of callbacks to create")
@@ -27,14 +37,14 @@ func main() {
 
 	_, err := client.Head(jobsURL)
 	if err != nil {
-		log.Fatalf("Schedula server is not available: %v", err)
+		log.Fatalf("ERROR: schedula server is unavailable: %v", err)
 	}
 
 	jobsCreated := 0
 	for i := 1; i <= *numberOfCalbacks; i++ {
-		job := &schedula.Job{
+		job := &Job{
 			CallbackURL: fmt.Sprintf("http://127.0.0.1:%d/callback/%d", *serverPort, i),
-			Schedule: schedula.JobSchedule{
+			Schedule: JobSchedule{
 				Format: "timestamp",
 				Value:  fmt.Sprintf("%v", callbackTime.Unix()),
 			},
