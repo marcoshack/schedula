@@ -3,8 +3,8 @@ package main
 import "testing"
 
 func createScheduler(t *testing.T) (Scheduler, *RepositoryMock) {
-	r := NewRepositoryMock()
-	e := NewCallbackExecutorMock()
+	r := &RepositoryMock{}
+	e := &CallbackExecutorMock{}
 	s, err := InitAndStartScheduler(r, e, SchedulerConfig{})
 	if err != nil {
 		t.Fatalf("failed to initialize scheduler: %v", err)
@@ -21,12 +21,28 @@ func assertReposityCall(method string, count int, r *RepositoryMock, t *testing.
 //
 // TODO replace with a mock framework like golang/mock
 //
-type RepositoryMock struct {
+type CounterMock struct {
 	counters map[string]int
 }
 
-func NewRepositoryMock() *RepositoryMock {
-	return &RepositoryMock{counters: make(map[string]int)}
+func (m *CounterMock) Counter(method string) int {
+	m.assertInit()
+	return m.counters[method]
+}
+
+func (m *CounterMock) Inc(method string) {
+	m.assertInit()
+	m.counters[method]++
+}
+
+func (m *CounterMock) assertInit() {
+	if m.counters == nil {
+		m.counters = make(map[string]int)
+	}
+}
+
+type RepositoryMock struct {
+	CounterMock
 }
 
 func (r *RepositoryMock) Counter(method string) int {
@@ -34,22 +50,22 @@ func (r *RepositoryMock) Counter(method string) int {
 }
 
 func (r *RepositoryMock) Add(job Job) (Job, error) {
-	r.inc("Add")
+	r.Inc("Add")
 	return job, nil
 }
 
 func (r *RepositoryMock) Get(id string) (Job, error) {
-	r.inc("Get")
+	r.Inc("Get")
 	return Job{ID: id}, nil
 }
 
 func (r *RepositoryMock) List(skip int, limit int) ([]Job, error) {
-	r.inc("List")
+	r.Inc("List")
 	return make([]Job, 0), nil
 }
 
 func (r *RepositoryMock) Count() int {
-	r.inc("Count")
+	r.Inc("Count")
 	return r.counters["Count"]
 }
 
@@ -58,36 +74,25 @@ func (r *RepositoryMock) ListBySchedule(timestamp int64) ([]Job, error) {
 }
 
 func (r *RepositoryMock) Remove(jobID string) (Job, error) {
-	r.inc("Remove")
+	r.Inc("Remove")
 	return Job{ID: jobID}, nil
 }
 
 func (r *RepositoryMock) Cancel(jobID string) (Job, error) {
-	r.inc("Cancel")
+	r.Inc("Cancel")
 	return Job{ID: jobID}, nil
 }
 
 func (r *RepositoryMock) UpdateStatus(jobID string, status string) (Job, error) {
-	r.inc("SetStatus")
+	r.Inc("SetStatus")
 	return Job{ID: jobID}, nil
 }
 
-func (r *RepositoryMock) inc(method string) {
-	r.counters[method]++
-}
-
 type CallbackExecutorMock struct {
-	counters map[string]int
-}
-
-func NewCallbackExecutorMock() *CallbackExecutorMock {
-	return &CallbackExecutorMock{counters: make(map[string]int)}
+	CounterMock
 }
 
 func (e *CallbackExecutorMock) Execute(job Job) error {
+	e.Inc("Execute")
 	return nil
-}
-
-func (e *CallbackExecutorMock) inc(method string) {
-	e.counters[method]++
 }
