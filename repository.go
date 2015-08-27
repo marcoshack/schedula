@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/go-uuid/uuid"
+	"github.com/marcoshack/schedula/Godeps/_workspace/src/code.google.com/p/go-uuid/uuid"
 )
 
 // Repository ...

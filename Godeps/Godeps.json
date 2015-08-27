@@ -1,0 +1,19 @@
+{
+	"ImportPath": "github.com/marcoshack/schedula",
+	"GoVersion": "go1.5",
+	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/go-uuid/uuid",
+			"Comment": "null-15",
+			"Rev": "35bc42037350f0078e3c974c6ea690f1926603ab"
+		},
+		{
+			"ImportPath": "github.com/gorilla/context",
+			"Rev": "215affda49addc4c8ef7e2534915df2c8c35c6cd"
+		},
+		{
+			"ImportPath": "github.com/gorilla/mux",
+			"Rev": "660d31f8602b95058fed6833debf113e85350868"
+		}
+	]
+}

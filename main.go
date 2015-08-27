@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gorilla/mux"
+	"github.com/marcoshack/schedula/Godeps/_workspace/src/github.com/gorilla/mux"
 )
 
 const (

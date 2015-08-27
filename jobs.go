@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gorilla/mux"
+	"github.com/marcoshack/schedula/Godeps/_workspace/src/github.com/gorilla/mux"
 )
 
 const (
