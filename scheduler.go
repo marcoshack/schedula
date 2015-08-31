@@ -71,7 +71,7 @@ func (s *TickerScheduler) Start() error {
 	s.ticker = time.NewTicker(s.tickInterval)
 
 	for i := 0; i < s.Config.NumberOfWorkers; i++ {
-		go s.executeJobs(s.callbackChannel)
+		go s.workerLoop(s.callbackChannel)
 	}
 
 	go s.tickerLoop()
@@ -100,27 +100,29 @@ func (s *TickerScheduler) publishJobs(now time.Time) {
 		return
 	}
 
-	if jobs != nil && len(jobs) != 0 {
-		log.Printf("scheduler: launching %d callbacks scheduled at %v (%v)", len(jobs), now.Unix(), now)
-		for _, job := range jobs {
-			if job.IsExecutable() {
-				s.callbackChannel <- job
-			}
+	if jobs == nil || len(jobs) == 0 {
+		return
+	}
+
+	log.Printf("scheduler: launching %d callbacks scheduled at %v (%v)", len(jobs), now.Unix(), now)
+	for _, job := range jobs {
+		if job.IsExecutable() {
+			s.callbackChannel <- job
 		}
 	}
 }
 
-func (s *TickerScheduler) executeJobs(jobs chan Job) {
+func (s *TickerScheduler) workerLoop(jobs chan Job) {
 	for job := range jobs {
-		var status string
+		var newStatus string
 		if err := s.callbackExecutor.Execute(job); err == nil {
-			status = JobStatusSuccess
+			newStatus = JobStatusSuccess
 		} else {
-			status = JobStatusError
+			newStatus = JobStatusError
 			log.Printf("scheduler: job[ID:%s]: error executing callback: %v", job.ID, err)
 		}
-		if _, err := s.jobs.UpdateStatus(job.ID, status); err != nil {
-			log.Printf("scheduler: job[ID:%s]: error updating job status: %v", job.ID, err)
+		if _, err := s.jobs.UpdateStatus(job.ID, newStatus); err != nil {
+			log.Printf("scheduler: job[ID:%s]: error updating job status to '%s': %v", job.ID, newStatus, err)
 		}
 	}
 }
