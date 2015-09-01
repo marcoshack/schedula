@@ -100,13 +100,6 @@ func TestCancel(t *testing.T) {
 	assertStatus(t, repo, job.ID, entity.JobStatusCanceled)
 }
 
-func TestSetStatus(t *testing.T) {
-	repo, _ := New("in-memory")
-	job, _ := repo.Add(aJob())
-	repo.UpdateStatus(job.ID, entity.JobStatusError)
-	assertStatus(t, repo, job.ID, entity.JobStatusError)
-}
-
 func TestAddExecution(t *testing.T) {
 	repo, _ := New("in-memory")
 	job, _ := repo.Add(aJob())
@@ -114,6 +107,9 @@ func TestAddExecution(t *testing.T) {
 	updatedJob, _ := repo.Get(job.ID)
 	if len(updatedJob.Executions) != 1 {
 		t.Fatalf("expected job executions size to be 1 but got %d", len(updatedJob.Executions))
+	}
+	if updatedJob.Status != entity.JobStatusSuccess {
+		t.Fatalf("expected job status to be '%s' but got '%s'", entity.JobStatusSuccess, updatedJob.Status)
 	}
 }
 

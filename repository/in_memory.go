@@ -167,16 +167,6 @@ func (r *InMemoryJobRepository) Cancel(jobID string) (entity.Job, error) {
 	return *job, nil
 }
 
-// UpdateStatus changes the status of the job identified by the given ID
-func (r *InMemoryJobRepository) UpdateStatus(jobID string, status string) (entity.Job, error) {
-	job, err := r.get(jobID)
-	if err != nil {
-		return entity.Job{}, err
-	}
-	job.Status = status
-	return *job, nil
-}
-
 // AddExecution ...
 func (r *InMemoryJobRepository) AddExecution(jobID string, date time.Time, status string, message string) (entity.Job, error) {
 	job, err := r.get(jobID)
@@ -184,5 +174,6 @@ func (r *InMemoryJobRepository) AddExecution(jobID string, date time.Time, statu
 		return entity.Job{}, err
 	}
 	job.Executions = append(job.Executions, entity.JobExecution{Timestamp: date.Unix(), Status: status, Message: message})
+	job.Status = status
 	return *job, nil
 }

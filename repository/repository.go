@@ -14,7 +14,6 @@ type Repository interface {
 	List(skip int, limit int) ([]entity.Job, error)
 	Remove(jobID string) (entity.Job, error)
 	Cancel(jobID string) (entity.Job, error)
-	UpdateStatus(jobID string, status string) (entity.Job, error)
 	AddExecution(jobID string, date time.Time, status string, message string) (entity.Job, error)
 	Count() int
 	ListBySchedule(timestamp int64) ([]entity.Job, error)

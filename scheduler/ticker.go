@@ -73,17 +73,16 @@ func (s *TickerScheduler) publishJobs(now time.Time) {
 func (s *TickerScheduler) workerLoop(jobs chan entity.Job) {
 	for job := range jobs {
 		var newStatus string
+		var errMessage string
 		if err := s.callbackExecutor.Execute(job); err == nil {
 			newStatus = entity.JobStatusSuccess
 		} else {
 			newStatus = entity.JobStatusError
+			errMessage = fmt.Sprintf("%v", err)
 			log.Printf("scheduler: job[ID:%s]: error executing callback: %v", job.ID, err)
 		}
-		if _, err := s.jobs.UpdateStatus(job.ID, newStatus); err != nil {
-			log.Printf("scheduler: job[ID:%s]: error updating job status to '%s': %v", job.ID, newStatus, err)
-		}
-		if _, err := s.jobs.AddExecution(job.ID, time.Now(), newStatus, ""); err != nil {
-			log.Printf("scheduler: job[ID:%s]: error adding execution entry: %v", job.ID, err)
+		if _, err := s.jobs.AddExecution(job.ID, time.Now(), newStatus, errMessage); err != nil {
+			log.Printf("scheduler: job[ID:%s]: error adding execution with status '%s': %v", job.ID, newStatus, err)
 		}
 	}
 }
