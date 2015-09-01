@@ -1,66 +1,25 @@
-package main
+package scheduler
 
 import (
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/marcoshack/schedula/callback"
+	"github.com/marcoshack/schedula/entity"
+	"github.com/marcoshack/schedula/repository"
 )
-
-const (
-	// DefaultTickInterval is the number of seconds for scheduler's ticker
-	DefaultTickInterval = 1
-
-	// DefaultNumberOfWorkers is the number of go routines spawned to execute callbacks for each tick
-	DefaultNumberOfWorkers = 50
-)
-
-// Scheduler is a service to schedule jobs
-type Scheduler interface {
-	Start() error
-	Stop() error
-}
-
-// SchedulerConfig holds Scheduler configuration parameters
-type SchedulerConfig struct {
-	NumberOfWorkers int
-}
 
 // TickerScheduler implements Scheduler interface using non-replicated in-memory data structure.
 // This is a example implementation and should be used only for test purposes.
 type TickerScheduler struct {
-	Config SchedulerConfig
+	Config Config
 
 	tickInterval     time.Duration
 	ticker           *time.Ticker
-	jobs             Repository
-	callbackExecutor CallbackExecutor
-	callbackChannel  chan Job
-}
-
-// InitScheduler creates a new Scheduler instance of the given type.
-// Currently acceptable values for 'schedulerType' are: "in-memory"
-func InitScheduler(repo Repository, executor CallbackExecutor, config SchedulerConfig) (Scheduler, error) {
-	return &TickerScheduler{
-		Config:           config,
-		jobs:             repo,
-		callbackExecutor: executor,
-		tickInterval:     DefaultTickInterval * time.Second,
-		callbackChannel:  make(chan Job, 10000),
-	}, nil
-}
-
-// InitAndStartScheduler ...
-func InitAndStartScheduler(repo Repository, executor CallbackExecutor, config SchedulerConfig) (Scheduler, error) {
-	scheduler, initErr := InitScheduler(repo, executor, config)
-	if initErr != nil {
-		return nil, initErr
-	}
-
-	startErr := scheduler.Start()
-	if startErr != nil {
-		return nil, startErr
-	}
-	return scheduler, nil
+	jobs             repository.Repository
+	callbackExecutor callback.Executor
+	callbackChannel  chan entity.Job
 }
 
 // Start ...
@@ -112,13 +71,13 @@ func (s *TickerScheduler) publishJobs(now time.Time) {
 	}
 }
 
-func (s *TickerScheduler) workerLoop(jobs chan Job) {
+func (s *TickerScheduler) workerLoop(jobs chan entity.Job) {
 	for job := range jobs {
 		var newStatus string
 		if err := s.callbackExecutor.Execute(job); err == nil {
-			newStatus = JobStatusSuccess
+			newStatus = entity.JobStatusSuccess
 		} else {
-			newStatus = JobStatusError
+			newStatus = entity.JobStatusError
 			log.Printf("scheduler: job[ID:%s]: error executing callback: %v", job.ID, err)
 		}
 		if _, err := s.jobs.UpdateStatus(job.ID, newStatus); err != nil {

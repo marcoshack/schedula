@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/marcoshack/schedula/Godeps/_workspace/src/github.com/gorilla/mux"
+	"github.com/marcoshack/schedula/repository"
 )
 
 const (
@@ -16,13 +17,18 @@ const (
 	MaxPageSize = 100
 )
 
-// JobsHandler is a HTTP handler to retrieve and manipulate jobs
-type JobsHandler struct {
+// Jobs is a HTTP handler to retrieve and manipulate jobs
+type Jobs struct {
 	path       string
-	repository Repository
+	repository repository.Repository
 }
 
-func (h *JobsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// NewJobsHandler ...
+func NewJobsHandler(path string, repo repository.Repository) *Jobs {
+	return &Jobs{repository: repo, path: path}
+}
+
+func (h *Jobs) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	switch r.Method {
 	case "GET":
@@ -33,7 +39,7 @@ func (h *JobsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // List all jobs in JSON format
-func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
+func (h *Jobs) List(w http.ResponseWriter, r *http.Request) {
 	skip := ParseIntParam(r, "skip", 0)
 	limit := ParseIntParam(r, "limit", MaxPageSize)
 
@@ -56,7 +62,7 @@ func (h *JobsHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create a job from a JSON representation
-func (h *JobsHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *Jobs) Create(w http.ResponseWriter, r *http.Request) {
 	job, err := ParseJob(r)
 	if err != nil {
 		log.Printf("jobs: error parsing job: %s", err)
@@ -76,7 +82,7 @@ func (h *JobsHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 // Find retrieves the job specified by the 'id' path parameter
-func (h *JobsHandler) Find(w http.ResponseWriter, r *http.Request) {
+func (h *Jobs) Find(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	job, err := h.repository.Get(id)
 
@@ -100,7 +106,7 @@ func (h *JobsHandler) Find(w http.ResponseWriter, r *http.Request) {
 }
 
 // Delete remove the given Job ID
-func (h *JobsHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (h *Jobs) Delete(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	_, err := h.repository.Cancel(id)
 	if err != nil {

@@ -1,11 +1,15 @@
-package main
+package scheduler
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/marcoshack/schedula/entity"
+)
 
 func createScheduler(t *testing.T) (Scheduler, *RepositoryMock) {
 	r := &RepositoryMock{}
 	e := &CallbackExecutorMock{}
-	s, err := InitAndStartScheduler(r, e, SchedulerConfig{})
+	s, err := StartNew("in-memory", r, e, Config{})
 	if err != nil {
 		t.Fatalf("failed to initialize scheduler: %v", err)
 	}
@@ -49,19 +53,19 @@ func (r *RepositoryMock) Counter(method string) int {
 	return r.counters[method]
 }
 
-func (r *RepositoryMock) Add(job Job) (Job, error) {
+func (r *RepositoryMock) Add(job entity.Job) (entity.Job, error) {
 	r.Inc("Add")
 	return job, nil
 }
 
-func (r *RepositoryMock) Get(id string) (Job, error) {
+func (r *RepositoryMock) Get(id string) (entity.Job, error) {
 	r.Inc("Get")
-	return Job{ID: id}, nil
+	return entity.Job{ID: id}, nil
 }
 
-func (r *RepositoryMock) List(skip int, limit int) ([]Job, error) {
+func (r *RepositoryMock) List(skip int, limit int) ([]entity.Job, error) {
 	r.Inc("List")
-	return make([]Job, 0), nil
+	return make([]entity.Job, 0), nil
 }
 
 func (r *RepositoryMock) Count() int {
@@ -69,30 +73,30 @@ func (r *RepositoryMock) Count() int {
 	return r.counters["Count"]
 }
 
-func (r *RepositoryMock) ListBySchedule(timestamp int64) ([]Job, error) {
-	return make([]Job, 0), nil
+func (r *RepositoryMock) ListBySchedule(timestamp int64) ([]entity.Job, error) {
+	return make([]entity.Job, 0), nil
 }
 
-func (r *RepositoryMock) Remove(jobID string) (Job, error) {
+func (r *RepositoryMock) Remove(jobID string) (entity.Job, error) {
 	r.Inc("Remove")
-	return Job{ID: jobID}, nil
+	return entity.Job{ID: jobID}, nil
 }
 
-func (r *RepositoryMock) Cancel(jobID string) (Job, error) {
+func (r *RepositoryMock) Cancel(jobID string) (entity.Job, error) {
 	r.Inc("Cancel")
-	return Job{ID: jobID}, nil
+	return entity.Job{ID: jobID}, nil
 }
 
-func (r *RepositoryMock) UpdateStatus(jobID string, status string) (Job, error) {
+func (r *RepositoryMock) UpdateStatus(jobID string, status string) (entity.Job, error) {
 	r.Inc("SetStatus")
-	return Job{ID: jobID}, nil
+	return entity.Job{ID: jobID}, nil
 }
 
 type CallbackExecutorMock struct {
 	CounterMock
 }
 
-func (e *CallbackExecutorMock) Execute(job Job) error {
+func (e *CallbackExecutorMock) Execute(job entity.Job) error {
 	e.Inc("Execute")
 	return nil
 }

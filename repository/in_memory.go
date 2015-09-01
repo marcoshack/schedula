@@ -1,43 +1,25 @@
-package main
+package repository
 
 import (
 	"sync"
 
-	"github.com/marcoshack/schedula/Godeps/_workspace/src/code.google.com/p/go-uuid/uuid"
+	"github.com/marcoshack/schedula/entity"
+
+	"code.google.com/p/go-uuid/uuid"
 )
-
-// Repository ...
-type Repository interface {
-	Add(Job) (Job, error)
-	Get(id string) (Job, error)
-	List(skip int, limit int) ([]Job, error)
-	Remove(jobID string) (Job, error)
-	Cancel(jobID string) (Job, error)
-	UpdateStatus(jobID string, status string) (Job, error)
-	Count() int
-	ListBySchedule(timestamp int64) ([]Job, error)
-}
-
-// NewRepository ...
-func NewRepository() (Repository, error) {
-	return &InMemoryJobRepository{
-		jobsByID:       make(map[string]*Job),
-		jobsBySchedule: make(map[int64][]*Job),
-	}, nil
-}
 
 // InMemoryJobRepository ...
 type InMemoryJobRepository struct {
 	sync.RWMutex
-	jobsByID       map[string]*Job
-	jobsBySchedule map[int64][]*Job
+	jobsByID       map[string]*entity.Job
+	jobsBySchedule map[int64][]*entity.Job
 	jobIndexByID   []string
 }
 
 // Add ...
-func (r *InMemoryJobRepository) Add(job Job) (Job, error) {
+func (r *InMemoryJobRepository) Add(job entity.Job) (entity.Job, error) {
 	job.ID = uuid.New()
-	job.Status = JobStatusPending
+	job.Status = entity.JobStatusPending
 
 	r.Lock()
 	defer r.Unlock()
@@ -47,10 +29,10 @@ func (r *InMemoryJobRepository) Add(job Job) (Job, error) {
 
 	jobTime, err := job.Schedule.NextTimestamp()
 	if err != nil {
-		return Job{}, err
+		return entity.Job{}, err
 	}
 	if r.jobsBySchedule[jobTime] == nil {
-		r.jobsBySchedule[jobTime] = make([]*Job, 0)
+		r.jobsBySchedule[jobTime] = make([]*entity.Job, 0)
 	}
 	r.jobsBySchedule[jobTime] = append(r.jobsBySchedule[jobTime], &job)
 
@@ -58,28 +40,28 @@ func (r *InMemoryJobRepository) Add(job Job) (Job, error) {
 }
 
 // Get returns the Job associated with the given id or nil if it doensn't exist
-func (r *InMemoryJobRepository) Get(id string) (Job, error) {
+func (r *InMemoryJobRepository) Get(id string) (entity.Job, error) {
 	job, _ := r.get(id)
 	if job != nil {
 		return *job, nil
 	}
-	return Job{}, nil
+	return entity.Job{}, nil
 }
 
-func (r *InMemoryJobRepository) get(id string) (*Job, error) {
+func (r *InMemoryJobRepository) get(id string) (*entity.Job, error) {
 	r.RLock()
 	defer r.RUnlock()
 	return r.jobsByID[id], nil
 }
 
 // List returns the list of scheduled jobs
-func (r *InMemoryJobRepository) List(skip int, limit int) ([]Job, error) {
+func (r *InMemoryJobRepository) List(skip int, limit int) ([]entity.Job, error) {
 	r.RLock()
 	defer r.RUnlock()
 
 	// empty result
 	if len(r.jobsByID) == 0 || skip > len(r.jobsByID) || limit < 0 {
-		return make([]Job, 0), nil
+		return make([]entity.Job, 0), nil
 	}
 
 	start := skip
@@ -92,7 +74,7 @@ func (r *InMemoryJobRepository) List(skip int, limit int) ([]Job, error) {
 	}
 
 	ids := r.jobIndexByID[start:end]
-	jobs := make([]Job, len(ids))
+	jobs := make([]entity.Job, len(ids))
 	for i := 0; i < len(ids); i++ {
 		jobs[i] = *r.jobsByID[ids[i]]
 	}
@@ -108,12 +90,12 @@ func (r *InMemoryJobRepository) Count() int {
 }
 
 // ListBySchedule returns the list of Jobs scheduled for the given timestamp
-func (r *InMemoryJobRepository) ListBySchedule(timestamp int64) ([]Job, error) {
+func (r *InMemoryJobRepository) ListBySchedule(timestamp int64) ([]entity.Job, error) {
 	r.RLock()
 	defer r.RUnlock()
 	schedList := r.jobsBySchedule[timestamp]
 
-	res := make([]Job, len(schedList))
+	res := make([]entity.Job, len(schedList))
 	for i := 0; i < len(res); i++ {
 		res[i] = *schedList[i]
 	}
@@ -122,7 +104,7 @@ func (r *InMemoryJobRepository) ListBySchedule(timestamp int64) ([]Job, error) {
 }
 
 // Remove ...
-func (r *InMemoryJobRepository) Remove(jobID string) (Job, error) {
+func (r *InMemoryJobRepository) Remove(jobID string) (entity.Job, error) {
 	job, err := r.get(jobID)
 	if err != nil {
 		return *job, err
@@ -153,7 +135,7 @@ func (r *InMemoryJobRepository) Remove(jobID string) (Job, error) {
 	// remove from r.jobsBySchedule
 	// TODO use append to rebuild
 	scheduledJobs := r.jobsBySchedule[jobTimestamp]
-	newScheduledJobs := make([]*Job, len(scheduledJobs)-1)
+	newScheduledJobs := make([]*entity.Job, len(scheduledJobs)-1)
 	for i, j := 0, 0; i < len(newScheduledJobs); i, j = i+1, j+1 {
 		if scheduledJobs[i].ID == jobID {
 			scheduledJobs[j] = nil
@@ -167,20 +149,20 @@ func (r *InMemoryJobRepository) Remove(jobID string) (Job, error) {
 }
 
 // Cancel changes job status to JobStatusCanceled
-func (r *InMemoryJobRepository) Cancel(jobID string) (Job, error) {
+func (r *InMemoryJobRepository) Cancel(jobID string) (entity.Job, error) {
 	job, err := r.get(jobID)
 	if err != nil {
-		return Job{}, err
+		return entity.Job{}, err
 	}
-	job.Status = JobStatusCanceled
+	job.Status = entity.JobStatusCanceled
 	return *job, nil
 }
 
 // UpdateStatus changes the status of the job identified by the given ID
-func (r *InMemoryJobRepository) UpdateStatus(jobID string, status string) (Job, error) {
+func (r *InMemoryJobRepository) UpdateStatus(jobID string, status string) (entity.Job, error) {
 	job, err := r.get(jobID)
 	if err != nil {
-		return Job{}, err
+		return entity.Job{}, err
 	}
 	job.Status = status
 	return *job, nil

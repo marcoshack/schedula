@@ -1,10 +1,12 @@
-package main
+package handler
 
 import (
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/marcoshack/schedula/entity"
 )
 
 // ErrorResponse ...
@@ -14,8 +16,8 @@ func ErrorResponse(w http.ResponseWriter, err error, status int) {
 }
 
 // ParseJob ...
-func ParseJob(r *http.Request) (Job, error) {
-	var job Job
+func ParseJob(r *http.Request) (entity.Job, error) {
+	var job entity.Job
 	dec := json.NewDecoder(r.Body)
 	return job, dec.Decode(&job)
 }

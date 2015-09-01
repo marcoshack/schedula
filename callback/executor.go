@@ -1,32 +1,35 @@
-package main
+package callback
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/marcoshack/schedula/entity"
+	"github.com/marcoshack/schedula/repository"
 )
 
-// CallbackExecutor is responsible for executing job's callback
-type CallbackExecutor interface {
-	Execute(Job) error
+// Executor is responsible for executing job's callback
+type Executor interface {
+	Execute(entity.Job) error
 }
 
-// NewCallbackExecutor returns an instance of CallbackExecutor
-func NewCallbackExecutor() (CallbackExecutor, error) {
-	return &SynchronousCallbackExecutor{
+// NewExecutor returns an instance of Executor
+func NewExecutor() (Executor, error) {
+	return &SynchronousExecutor{
 		httpClient: &http.Client{},
 	}, nil
 }
 
-// SynchronousCallbackExecutor ...
-type SynchronousCallbackExecutor struct {
-	repository Repository
+// SynchronousExecutor ...
+type SynchronousExecutor struct {
+	repository repository.Repository
 	httpClient *http.Client
 }
 
 // Execute ...
-func (s *SynchronousCallbackExecutor) Execute(job Job) error {
+func (s *SynchronousExecutor) Execute(job entity.Job) error {
 	req, err := s.createCallbackRequest(job)
 	if err != nil {
 		return err
@@ -44,7 +47,7 @@ func (s *SynchronousCallbackExecutor) Execute(job Job) error {
 	return nil
 }
 
-func (s *SynchronousCallbackExecutor) createCallbackRequest(job Job) (*http.Request, error) {
+func (s *SynchronousExecutor) createCallbackRequest(job entity.Job) (*http.Request, error) {
 	var body = new(bytes.Buffer)
 	encErr := json.NewEncoder(body).Encode(job)
 	if encErr != nil {
