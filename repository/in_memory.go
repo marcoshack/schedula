@@ -16,6 +16,14 @@ type InMemoryJobRepository struct {
 	jobIndexByID   []string
 }
 
+// NewInMemoryJobRepository ...
+func NewInMemoryJobRepository() Repository {
+	return &InMemoryJobRepository{
+		jobsByID:       make(map[string]*entity.Job),
+		jobsBySchedule: make(map[int64][]*entity.Job),
+	}
+}
+
 // Add ...
 func (r *InMemoryJobRepository) Add(job entity.Job) (entity.Job, error) {
 	job.ID = uuid.New()

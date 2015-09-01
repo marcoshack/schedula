@@ -22,10 +22,7 @@ type Repository interface {
 func New(repoType string) (Repository, error) {
 	switch repoType {
 	case "in-memory":
-		return &InMemoryJobRepository{
-			jobsByID:       make(map[string]*entity.Job),
-			jobsBySchedule: make(map[int64][]*entity.Job),
-		}, nil
+		return NewInMemoryJobRepository(), nil
 	}
 	return nil, fmt.Errorf("invalid repository type: '%s'", repoType)
 }
