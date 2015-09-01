@@ -9,20 +9,38 @@ import (
 	"github.com/marcoshack/schedula/Godeps/_workspace/src/github.com/gorilla/mux"
 )
 
-const (
-	version = "v0.1"
-)
+const version = "0.1"
+
+var bindAddr = flag.String("b", "0.0.0.0", "IP `address` to bind")
+var bindPort = flag.Int("p", 8080, "TCP `port` number to bind")
+var nWorkers = flag.Int("w", 2, "number of `workers` to execute callback requests")
+
+type config struct {
+	BindAddr        string
+	BindPort        int
+	NumberOfWorkers int
+}
+
+func (c *config) ServerAddr() string {
+	return fmt.Sprintf("%s:%d", c.BindAddr, c.BindPort)
+}
+
+func readConfig() *config {
+	flag.Parse()
+	return &config{
+		BindAddr:        *bindAddr,
+		BindPort:        *bindPort,
+		NumberOfWorkers: *nWorkers,
+	}
+}
 
 func main() {
-	log.Printf("Schedula Server %s", version)
-	bindAddr := flag.String("b", "0.0.0.0", "IP `address` to bind")
-	bindPort := flag.Int("p", 8080, "TCP `port` number to bind")
-	nWorkers := flag.Int("w", 2, "number of `workers` to execute callback requests")
-	flag.Parse()
+	log.Printf("Schedula Server v%s", version)
+	config := readConfig()
 
 	repository := initRepository()
 	executor := initCallbackExecutor(repository)
-	scheduler := initScheduler(repository, executor, *nWorkers)
+	scheduler := initScheduler(repository, executor, config.NumberOfWorkers)
 
 	jobs := &JobsHandler{repository: repository, path: "/jobs/"}
 	router := mux.NewRouter()
@@ -31,9 +49,8 @@ func main() {
 	router.HandleFunc("/jobs/{id}", jobs.Find).Methods("GET")
 	router.HandleFunc("/jobs/{id}", jobs.Delete).Methods("DELETE")
 
-	serverAddr := fmt.Sprintf("%s:%d", *bindAddr, *bindPort)
-	log.Printf("Listening on %s", serverAddr)
-	log.Fatal(http.ListenAndServe(serverAddr, router))
+	log.Printf("Listening on %s", config.ServerAddr())
+	log.Fatal(http.ListenAndServe(config.ServerAddr(), router))
 
 	scheduler.Stop()
 }
