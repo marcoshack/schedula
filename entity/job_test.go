@@ -8,7 +8,7 @@ import (
 )
 
 func TestJSONMarshal(t *testing.T) {
-	var expected = []byte(`{"id":"","businessKey":"","callbackURL":"http://example.com/","data":null,"schedule":{"format":"timestamp","value":"1438948984"},"status":""}`)
+	var expected = []byte(`{"id":"","clientKey":"","callbackURL":"http://example.com/","data":null,"schedule":{"format":"timestamp","value":"1438948984"},"status":"","executions":null}`)
 
 	job := &Job{
 		CallbackURL: "http://example.com/",

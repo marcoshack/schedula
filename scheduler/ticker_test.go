@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"testing"
+	"time"
 
 	"github.com/marcoshack/schedula/entity"
 )
@@ -89,6 +90,11 @@ func (r *RepositoryMock) Cancel(jobID string) (entity.Job, error) {
 
 func (r *RepositoryMock) UpdateStatus(jobID string, status string) (entity.Job, error) {
 	r.Inc("SetStatus")
+	return entity.Job{ID: jobID}, nil
+}
+
+func (r *RepositoryMock) AddExecution(jobID string, date time.Time, status string, message string) (entity.Job, error) {
+	r.Inc("AddExecution")
 	return entity.Job{ID: jobID}, nil
 }
 

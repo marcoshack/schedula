@@ -2,6 +2,7 @@ package repository
 
 import (
 	"sync"
+	"time"
 
 	"github.com/marcoshack/schedula/entity"
 
@@ -173,5 +174,15 @@ func (r *InMemoryJobRepository) UpdateStatus(jobID string, status string) (entit
 		return entity.Job{}, err
 	}
 	job.Status = status
+	return *job, nil
+}
+
+// AddExecution ...
+func (r *InMemoryJobRepository) AddExecution(jobID string, date time.Time, status string, message string) (entity.Job, error) {
+	job, err := r.get(jobID)
+	if err != nil {
+		return entity.Job{}, err
+	}
+	job.Executions = append(job.Executions, entity.JobExecution{Timestamp: date.Unix(), Status: status, Message: message})
 	return *job, nil
 }

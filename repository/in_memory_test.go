@@ -5,6 +5,7 @@ import (
 	"log"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/marcoshack/schedula/entity"
 )
@@ -106,6 +107,16 @@ func TestSetStatus(t *testing.T) {
 	assertStatus(t, repo, job.ID, entity.JobStatusError)
 }
 
+func TestAddExecution(t *testing.T) {
+	repo, _ := New("in-memory")
+	job, _ := repo.Add(aJob())
+	repo.AddExecution(job.ID, time.Now(), entity.JobStatusSuccess, "ok")
+	updatedJob, _ := repo.Get(job.ID)
+	if len(updatedJob.Executions) != 1 {
+		t.Fatalf("expected job executions size to be 1 but got %d", len(updatedJob.Executions))
+	}
+}
+
 func ExampleScheduler_List_ordering() {
 	repo, _ := New("in-memory")
 	n := 10
@@ -113,7 +124,7 @@ func ExampleScheduler_List_ordering() {
 	jobs, _ := repo.List(0, n)
 	keys := make([]string, n)
 	for j := range jobs {
-		keys[j] = jobs[j].BusinessKey
+		keys[j] = jobs[j].ClientKey
 	}
 	fmt.Println(keys)
 	// Output:
@@ -122,7 +133,7 @@ func ExampleScheduler_List_ordering() {
 
 func addJobs(repo Repository, n int) int {
 	for i := 0; i < n; i++ {
-		repo.Add(entity.Job{BusinessKey: strconv.Itoa(i)})
+		repo.Add(entity.Job{ClientKey: strconv.Itoa(i)})
 	}
 	return n
 }

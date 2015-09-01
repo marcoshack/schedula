@@ -25,11 +25,12 @@ const (
 // Job ...
 type Job struct {
 	ID          string            `json:"id"`
-	BusinessKey string            `json:"businessKey"`
+	ClientKey   string            `json:"clientKey"`
 	CallbackURL string            `json:"callbackURL"`
 	Data        map[string]string `json:"data"`
 	Schedule    JobSchedule       `json:"schedule"`
 	Status      string            `json:"status"`
+	Executions  []JobExecution    `json:"executions"`
 }
 
 // IsExecutable returns whether the job callback should be executed
@@ -41,6 +42,13 @@ func (j *Job) IsExecutable() bool {
 type JobSchedule struct {
 	Format string `json:"format"`
 	Value  string `json:"value"`
+}
+
+// JobExecution ...
+type JobExecution struct {
+	Timestamp int64
+	Status    string
+	Message   string
 }
 
 // IsValid checks the JobSchedule values and retrun

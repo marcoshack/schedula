@@ -13,8 +13,7 @@ import (
 // TickerScheduler implements Scheduler interface using non-replicated in-memory data structure.
 // This is a example implementation and should be used only for test purposes.
 type TickerScheduler struct {
-	Config Config
-
+	Config           Config
 	tickInterval     time.Duration
 	ticker           *time.Ticker
 	jobs             repository.Repository
@@ -82,6 +81,9 @@ func (s *TickerScheduler) workerLoop(jobs chan entity.Job) {
 		}
 		if _, err := s.jobs.UpdateStatus(job.ID, newStatus); err != nil {
 			log.Printf("scheduler: job[ID:%s]: error updating job status to '%s': %v", job.ID, newStatus, err)
+		}
+		if _, err := s.jobs.AddExecution(job.ID, time.Now(), newStatus, ""); err != nil {
+			log.Printf("scheduler: job[ID:%s]: error adding execution entry: %v", job.ID, err)
 		}
 	}
 }

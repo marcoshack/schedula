@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/marcoshack/schedula/entity"
 )
@@ -14,6 +15,7 @@ type Repository interface {
 	Remove(jobID string) (entity.Job, error)
 	Cancel(jobID string) (entity.Job, error)
 	UpdateStatus(jobID string, status string) (entity.Job, error)
+	AddExecution(jobID string, date time.Time, status string, message string) (entity.Job, error)
 	Count() int
 	ListBySchedule(timestamp int64) ([]entity.Job, error)
 }
