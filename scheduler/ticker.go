@@ -16,7 +16,7 @@ type TickerScheduler struct {
 	Config           Config
 	tickInterval     time.Duration
 	ticker           *time.Ticker
-	jobs             repository.Repository
+	jobs             repository.Jobs
 	callbackExecutor callback.Executor
 	callbackChannel  chan entity.Job
 }

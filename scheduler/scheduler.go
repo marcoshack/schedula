@@ -30,7 +30,7 @@ type Config struct {
 
 // New creates a Scheduler instance of the given type.
 // Currently acceptable values for 'schedulerType' are: "in-memory"
-func New(t string, r repository.Repository, e callback.Executor, c Config) (Scheduler, error) {
+func New(t string, r repository.Jobs, e callback.Executor, c Config) (Scheduler, error) {
 	switch t {
 	case "ticker":
 		return &TickerScheduler{
@@ -45,7 +45,7 @@ func New(t string, r repository.Repository, e callback.Executor, c Config) (Sche
 }
 
 // StartNew creates and starts a Scheduler instance
-func StartNew(t string, r repository.Repository, e callback.Executor, c Config) (Scheduler, error) {
+func StartNew(t string, r repository.Jobs, e callback.Executor, c Config) (Scheduler, error) {
 	scheduler, initErr := New(t, r, e, c)
 	if initErr != nil {
 		return nil, initErr

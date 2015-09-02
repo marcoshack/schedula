@@ -18,8 +18,8 @@ const version = "0.1"
 var bindAddr = flag.String("b", "0.0.0.0", "IP `address` to bind")
 var bindPort = flag.Int("p", 8080, "TCP `port` number to bind")
 var nWorkers = flag.Int("w", 2, "number of `workers` to execute callback requests")
-var repoType = flag.String("repo-type", "in-memory", "Repository `type` (available: in-memory)")
-var schedType = flag.String("sched-type", "ticker", "Scheduler `type` (available: ticker)")
+var repoType = flag.String("repo-type", "in-memory", "Repository `type`: in-memory, in-memory-ch, redis, mysql")
+var schedType = flag.String("sched-type", "ticker", "Scheduler `type`: ticker")
 
 type config struct {
 	BindAddr        string
@@ -65,7 +65,7 @@ func main() {
 	scheduler.Stop()
 }
 
-func initRepository(repoType string) repository.Repository {
+func initRepository(repoType string) repository.Jobs {
 	repository, err := repository.New(repoType)
 	if err != nil {
 		log.Fatalf("schedula: error initializing repository: %v", err)
@@ -73,7 +73,7 @@ func initRepository(repoType string) repository.Repository {
 	return repository
 }
 
-func initCallbackExecutor(repository repository.Repository) callback.Executor {
+func initCallbackExecutor(repository repository.Jobs) callback.Executor {
 	executor, err := callback.NewExecutor()
 	if err != nil {
 		log.Fatalf("schedula: error initializing callback executor: %v", err)
@@ -81,7 +81,7 @@ func initCallbackExecutor(repository repository.Repository) callback.Executor {
 	return executor
 }
 
-func initScheduler(schedulerType string, r repository.Repository, e callback.Executor, nWorkers int) scheduler.Scheduler {
+func initScheduler(schedulerType string, r repository.Jobs, e callback.Executor, nWorkers int) scheduler.Scheduler {
 	scheduler, err := scheduler.StartNew(schedulerType, r, e, scheduler.Config{NumberOfWorkers: nWorkers})
 	if err != nil {
 		log.Fatalf("schedula: error initializing scheduler: %v", err)

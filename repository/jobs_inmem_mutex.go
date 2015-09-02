@@ -9,24 +9,24 @@ import (
 	"code.google.com/p/go-uuid/uuid"
 )
 
-// InMemoryJobRepository ...
-type InMemoryJobRepository struct {
+// JobsInMemoryWithMutex ...
+type JobsInMemoryWithMutex struct {
 	sync.RWMutex
 	jobsByID       map[string]*entity.Job
 	jobsBySchedule map[int64][]*entity.Job
 	jobIndexByID   []string
 }
 
-// NewInMemoryJobRepository ...
-func NewInMemoryJobRepository() Repository {
-	return &InMemoryJobRepository{
+// NewJobsInMemoryWithMutex ...
+func NewJobsInMemoryWithMutex() (Jobs, error) {
+	return &JobsInMemoryWithMutex{
 		jobsByID:       make(map[string]*entity.Job),
 		jobsBySchedule: make(map[int64][]*entity.Job),
-	}
+	}, nil
 }
 
 // Add ...
-func (r *InMemoryJobRepository) Add(job entity.Job) (entity.Job, error) {
+func (r *JobsInMemoryWithMutex) Add(job entity.Job) (entity.Job, error) {
 	job.ID = uuid.New()
 	job.Status = entity.JobStatusPending
 
@@ -49,7 +49,7 @@ func (r *InMemoryJobRepository) Add(job entity.Job) (entity.Job, error) {
 }
 
 // Get returns the Job associated with the given id or nil if it doensn't exist
-func (r *InMemoryJobRepository) Get(id string) (entity.Job, error) {
+func (r *JobsInMemoryWithMutex) Get(id string) (entity.Job, error) {
 	job, _ := r.get(id)
 	if job != nil {
 		return *job, nil
@@ -57,14 +57,14 @@ func (r *InMemoryJobRepository) Get(id string) (entity.Job, error) {
 	return entity.Job{}, nil
 }
 
-func (r *InMemoryJobRepository) get(id string) (*entity.Job, error) {
+func (r *JobsInMemoryWithMutex) get(id string) (*entity.Job, error) {
 	r.RLock()
 	defer r.RUnlock()
 	return r.jobsByID[id], nil
 }
 
 // List returns the list of scheduled jobs
-func (r *InMemoryJobRepository) List(skip int, limit int) ([]entity.Job, error) {
+func (r *JobsInMemoryWithMutex) List(skip int, limit int) ([]entity.Job, error) {
 	r.RLock()
 	defer r.RUnlock()
 
@@ -92,14 +92,14 @@ func (r *InMemoryJobRepository) List(skip int, limit int) ([]entity.Job, error) 
 }
 
 // Count returns the number of active jobs in the scheduler
-func (r *InMemoryJobRepository) Count() int {
+func (r *JobsInMemoryWithMutex) Count() int {
 	r.RLock()
 	defer r.RUnlock()
 	return len(r.jobIndexByID)
 }
 
 // ListBySchedule returns the list of Jobs scheduled for the given timestamp
-func (r *InMemoryJobRepository) ListBySchedule(timestamp int64) ([]entity.Job, error) {
+func (r *JobsInMemoryWithMutex) ListBySchedule(timestamp int64) ([]entity.Job, error) {
 	r.RLock()
 	defer r.RUnlock()
 	schedList := r.jobsBySchedule[timestamp]
@@ -113,7 +113,7 @@ func (r *InMemoryJobRepository) ListBySchedule(timestamp int64) ([]entity.Job, e
 }
 
 // Remove ...
-func (r *InMemoryJobRepository) Remove(jobID string) (entity.Job, error) {
+func (r *JobsInMemoryWithMutex) Remove(jobID string) (entity.Job, error) {
 	job, err := r.get(jobID)
 	if err != nil {
 		return *job, err
@@ -158,7 +158,7 @@ func (r *InMemoryJobRepository) Remove(jobID string) (entity.Job, error) {
 }
 
 // Cancel changes job status to JobStatusCanceled
-func (r *InMemoryJobRepository) Cancel(jobID string) (entity.Job, error) {
+func (r *JobsInMemoryWithMutex) Cancel(jobID string) (entity.Job, error) {
 	job, err := r.get(jobID)
 	if err != nil {
 		return entity.Job{}, err
@@ -168,7 +168,7 @@ func (r *InMemoryJobRepository) Cancel(jobID string) (entity.Job, error) {
 }
 
 // AddExecution ...
-func (r *InMemoryJobRepository) AddExecution(jobID string, date time.Time, status string, message string) (entity.Job, error) {
+func (r *JobsInMemoryWithMutex) AddExecution(jobID string, date time.Time, status string, message string) (entity.Job, error) {
 	job, err := r.get(jobID)
 	if err != nil {
 		return entity.Job{}, err

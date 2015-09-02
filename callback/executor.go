@@ -24,7 +24,7 @@ func NewExecutor() (Executor, error) {
 
 // SynchronousExecutor ...
 type SynchronousExecutor struct {
-	repository repository.Repository
+	repository repository.Jobs
 	httpClient *http.Client
 }
 

@@ -7,8 +7,8 @@ import (
 	"github.com/marcoshack/schedula/entity"
 )
 
-// Repository ...
-type Repository interface {
+// Jobs ...
+type Jobs interface {
 	Add(entity.Job) (entity.Job, error)
 	Get(id string) (entity.Job, error)
 	List(skip int, limit int) ([]entity.Job, error)
@@ -20,10 +20,16 @@ type Repository interface {
 }
 
 // New creates a repository instance of the given type.
-func New(repoType string) (Repository, error) {
+func New(repoType string) (Jobs, error) {
 	switch repoType {
-	case "in-memory":
-		return NewInMemoryJobRepository(), nil
+	case "in-memory", "in-memory-mutex": // in-memory default, for now
+		return NewJobsInMemoryWithMutex()
+	case "in-memory-ch":
+		return NewJobsInMemoryWithChannels()
+	case "redis":
+		return NewJobsRedis()
+	case "mysql":
+		return NewJobsMySQL()
 	}
 	return nil, fmt.Errorf("invalid repository type: '%s'", repoType)
 }

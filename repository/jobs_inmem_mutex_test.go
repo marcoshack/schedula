@@ -127,14 +127,14 @@ func ExampleScheduler_List_ordering() {
 	// [0 1 2 3 4 5 6 7 8 9]
 }
 
-func addJobs(repo Repository, n int) int {
+func addJobs(repo Jobs, n int) int {
 	for i := 0; i < n; i++ {
 		repo.Add(entity.Job{ClientKey: strconv.Itoa(i)})
 	}
 	return n
 }
 
-func assertStatus(t *testing.T, repo Repository, jobID string, expectedStatus string) {
+func assertStatus(t *testing.T, repo Jobs, jobID string, expectedStatus string) {
 	updatedJob, _ := repo.Get(jobID)
 	if updatedJob.Status != expectedStatus {
 		t.Fatalf("expected job status was '%s' but got '%s'", expectedStatus, updatedJob.Status)

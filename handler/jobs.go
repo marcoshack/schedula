@@ -20,11 +20,11 @@ const (
 // Jobs is a HTTP handler to retrieve and manipulate jobs
 type Jobs struct {
 	path       string
-	repository repository.Repository
+	repository repository.Jobs
 }
 
 // NewJobsHandler ...
-func NewJobsHandler(path string, repo repository.Repository) *Jobs {
+func NewJobsHandler(path string, repo repository.Jobs) *Jobs {
 	return &Jobs{repository: repo, path: path}
 }
 
