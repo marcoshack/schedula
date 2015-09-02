@@ -29,10 +29,10 @@ func (s *TickerScheduler) Start() error {
 	s.ticker = time.NewTicker(s.tickInterval)
 
 	for i := 0; i < s.Config.NumberOfWorkers; i++ {
-		go s.workerLoop(s.callbackChannel)
+		go s.handle(s.callbackChannel)
 	}
 
-	go s.tickerLoop()
+	go s.tick()
 	return nil
 }
 
@@ -45,24 +45,22 @@ func (s *TickerScheduler) Stop() error {
 	return nil
 }
 
-func (s *TickerScheduler) tickerLoop() {
+func (s *TickerScheduler) tick() {
 	for now := range s.ticker.C {
-		go s.publishJobs(now)
+		jobs, err := s.jobs.ListBySchedule(now.Unix())
+		if err != nil {
+			log.Printf("scheduler: error retrieving job list scheduled at %v: %v", now, err)
+			continue
+		}
+
+		if len(jobs) > 0 {
+			log.Printf("scheduler: launching %d callbacks scheduled at %v (%v)", len(jobs), now.Unix(), now)
+			go s.publish(jobs)
+		}
 	}
 }
 
-func (s *TickerScheduler) publishJobs(now time.Time) {
-	jobs, err := s.jobs.ListBySchedule(now.Unix())
-	if err != nil {
-		log.Printf("scheduler: error retrieving job list scheduled at %v: %v", now, err)
-		return
-	}
-
-	if jobs == nil || len(jobs) == 0 {
-		return
-	}
-
-	log.Printf("scheduler: launching %d callbacks scheduled at %v (%v)", len(jobs), now.Unix(), now)
+func (s *TickerScheduler) publish(jobs []entity.Job) {
 	for _, job := range jobs {
 		if job.IsExecutable() {
 			s.callbackChannel <- job
@@ -70,7 +68,7 @@ func (s *TickerScheduler) publishJobs(now time.Time) {
 	}
 }
 
-func (s *TickerScheduler) workerLoop(jobs chan entity.Job) {
+func (s *TickerScheduler) handle(jobs chan entity.Job) {
 	for job := range jobs {
 		var newStatus string
 		var errMessage string
