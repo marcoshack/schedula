@@ -25,6 +25,7 @@ type JobSchedule struct {
 func main() {
 	numberOfCalbacks := flag.Int("n", 10, "`number` of callbacks to create")
 	serverPort := flag.Int("p", 8088, "HTTP `port` number to listen for callbacks")
+	serverAddr := flag.String("b", "127.0.0.1", "IP `address` to bind to listen for callbacks")
 	callbackTimeDelay := flag.Int("d", 5, "delay in `seconds` to create callbacks")
 	serverBaseURL := flag.String("s", "http://localhost:8080/", "Schedula server base `URL`")
 	flag.Parse()
@@ -44,7 +45,7 @@ func main() {
 	start := time.Now()
 	for i := 1; i <= *numberOfCalbacks; i++ {
 		job := &Job{
-			CallbackURL: fmt.Sprintf("http://127.0.0.1:%d/callback/%d", *serverPort, i),
+			CallbackURL: fmt.Sprintf("http://%s:%d/callback/%d", *serverAddr, *serverPort, i),
 			Schedule: JobSchedule{
 				Format: "timestamp",
 				Value:  fmt.Sprintf("%v", callbackTime.Unix()),
@@ -86,7 +87,7 @@ func main() {
 		log.Printf("INFO: %d callbacks created in %v seconds (~%d req/s)", jobsCreated, elapsed, rps)
 
 		server := &http.Server{
-			Addr: fmt.Sprintf("127.0.0.1:%d", *serverPort),
+			Addr: fmt.Sprintf("%s:%d", *serverAddr, *serverPort),
 		}
 
 		http.HandleFunc("/callback/", func(w http.ResponseWriter, r *http.Request) {
