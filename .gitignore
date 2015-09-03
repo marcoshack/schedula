@@ -1,4 +1,5 @@
 bin/schedula
+bin/client
 schedula
 *.log
 examples/client/client
