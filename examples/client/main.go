@@ -26,14 +26,15 @@ var (
 	numberOfCalbacks  = flag.Int("n", 10, "`number` of callbacks to create")
 	serverPort        = flag.Int("p", 8088, "TCP `port` number to listen for HTTP callbacks")
 	serverAddr        = flag.String("b", "127.0.0.1", "IP `address` to listen for HTTP callbacks")
-	callbackTimeDelay = flag.Int("d", 5, "delay in `seconds` to create callbacks")
 	serverBaseURL     = flag.String("s", "http://localhost:8080/", "Schedula server base `URL`")
+	callbackTimeDelta = flag.Int("delta", 5, "delta in `seconds` from the current to create callbacks")
+	callbackResDelay  = flag.Int("delay", 0, "delay in `milliseconds` to respond to callback request")
 )
 
 func main() {
 	flag.Parse()
-
-	callbackDelayDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", *callbackTimeDelay))
+	callbackDelayDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", *callbackTimeDelta))
+	callbackResDuration, _ := time.ParseDuration(fmt.Sprintf("%dms", *callbackResDelay))
 	callbackTime := time.Now().Add(callbackDelayDuration)
 	jobsURL := fmt.Sprintf("%sjobs/", *serverBaseURL)
 
@@ -94,6 +95,7 @@ func main() {
 		}
 
 		http.HandleFunc("/callback/", func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(callbackResDuration)
 			log.Printf("INFO: Callback received %s", r.URL.Path)
 		})
 
