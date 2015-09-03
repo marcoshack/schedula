@@ -22,12 +22,15 @@ type JobSchedule struct {
 	Value  string `json:"value"`
 }
 
+var (
+	numberOfCalbacks  = flag.Int("n", 10, "`number` of callbacks to create")
+	serverPort        = flag.Int("p", 8088, "TCP `port` number to listen for HTTP callbacks")
+	serverAddr        = flag.String("b", "127.0.0.1", "IP `address` to listen for HTTP callbacks")
+	callbackTimeDelay = flag.Int("d", 5, "delay in `seconds` to create callbacks")
+	serverBaseURL     = flag.String("s", "http://localhost:8080/", "Schedula server base `URL`")
+)
+
 func main() {
-	numberOfCalbacks := flag.Int("n", 10, "`number` of callbacks to create")
-	serverPort := flag.Int("p", 8088, "HTTP `port` number to listen for callbacks")
-	serverAddr := flag.String("b", "127.0.0.1", "IP `address` to bind to listen for callbacks")
-	callbackTimeDelay := flag.Int("d", 5, "delay in `seconds` to create callbacks")
-	serverBaseURL := flag.String("s", "http://localhost:8080/", "Schedula server base `URL`")
 	flag.Parse()
 
 	callbackDelayDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", *callbackTimeDelay))
