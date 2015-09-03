@@ -3,6 +3,7 @@ package scheduler
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"time"
 
 	"github.com/marcoshack/schedula/callback"
@@ -18,7 +19,26 @@ type TickerScheduler struct {
 	ticker           *time.Ticker
 	jobs             repository.Jobs
 	callbackExecutor callback.Executor
-	callbackChannel  chan entity.Job
+	HostContexts     map[string]*HostContext
+}
+
+// HostContext ...
+type HostContext struct {
+	Host     string
+	C        chan entity.Job
+	LastUsed time.Time
+	Workers  int
+}
+
+// NewTickerScheduler ...
+func NewTickerScheduler(r repository.Jobs, e callback.Executor, c Config) *TickerScheduler {
+	return &TickerScheduler{
+		Config:           c,
+		jobs:             r,
+		callbackExecutor: e,
+		tickInterval:     DefaultTickInterval * time.Second,
+		HostContexts:     make(map[string]*HostContext),
+	}
 }
 
 // Start ...
@@ -27,11 +47,6 @@ func (s *TickerScheduler) Start() error {
 		return fmt.Errorf("scheduler: scheduler already started")
 	}
 	s.ticker = time.NewTicker(s.tickInterval)
-
-	for i := 0; i < s.Config.NumberOfWorkers; i++ {
-		go s.handle(s.callbackChannel)
-	}
-
 	go s.tick()
 	return nil
 }
@@ -62,14 +77,43 @@ func (s *TickerScheduler) tick() {
 
 func (s *TickerScheduler) publish(jobs []entity.Job) {
 	for _, job := range jobs {
-		if job.IsExecutable() {
-			s.callbackChannel <- job
+		if !job.IsExecutable() {
+			continue
 		}
+
+		context, err := s.context(job)
+		if err != nil {
+			log.Printf("scheduler: error publishing job callback: %v", err)
+		}
+		context.C <- job
 	}
 }
 
-func (s *TickerScheduler) handle(jobs chan entity.Job) {
-	for job := range jobs {
+func (s *TickerScheduler) context(job entity.Job) (*HostContext, error) {
+	url, err := url.ParseRequestURI(job.CallbackURL)
+	if err != nil {
+		return nil, fmt.Errorf("unable to retrieve host context, error parsing callback URL: %v", err)
+	}
+
+	var context *HostContext
+	if _, exists := s.HostContexts[url.Host]; !exists {
+		context = &HostContext{
+			Host:     url.Host,
+			C:        make(chan entity.Job, 1000), // TODO think better about the host channel buffer size
+			LastUsed: time.Now(),
+			Workers:  s.Config.WorkersPerHost,
+		}
+		s.HostContexts[url.Host] = context
+		for i := 0; i < context.Workers; i++ {
+			go s.handle(context)
+		}
+		log.Printf("scheduler: host context for %s created with %d workers", context.Host, context.Workers)
+	}
+	return context, nil
+}
+
+func (s *TickerScheduler) handle(context *HostContext) {
+	for job := range context.C {
 		var newStatus string
 		var errMessage string
 		if err := s.callbackExecutor.Execute(job); err == nil {

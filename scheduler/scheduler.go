@@ -2,10 +2,8 @@ package scheduler
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/marcoshack/schedula/callback"
-	"github.com/marcoshack/schedula/entity"
 	"github.com/marcoshack/schedula/repository"
 )
 
@@ -25,7 +23,7 @@ type Scheduler interface {
 
 // Config holds Scheduler configuration parameters
 type Config struct {
-	NumberOfWorkers int
+	WorkersPerHost int
 }
 
 // New creates a Scheduler instance of the given type.
@@ -33,13 +31,7 @@ type Config struct {
 func New(t string, r repository.Jobs, e callback.Executor, c Config) (Scheduler, error) {
 	switch t {
 	case "ticker":
-		return &TickerScheduler{
-			Config:           c,
-			jobs:             r,
-			callbackExecutor: e,
-			tickInterval:     DefaultTickInterval * time.Second,
-			callbackChannel:  make(chan entity.Job, 10000),
-		}, nil
+		return NewTickerScheduler(r, e, c), nil
 	}
 	return nil, fmt.Errorf("invalid scheduler type: '%s'", t)
 }

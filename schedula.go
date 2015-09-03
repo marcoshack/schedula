@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/marcoshack/schedula/callback"
@@ -15,11 +16,14 @@ import (
 
 const version = "0.1"
 
-var bindAddr = flag.String("b", "0.0.0.0", "IP `address` to bind")
-var bindPort = flag.Int("p", 8080, "TCP `port` number to bind")
-var nWorkers = flag.Int("w", 2, "number of `workers` to execute callback requests")
-var repoType = flag.String("repo-type", "in-memory", "Repository `type`: in-memory, in-memory-ch, redis, mysql")
-var schedType = flag.String("sched-type", "ticker", "Scheduler `type`: ticker")
+var (
+	bindAddr  = flag.String("b", "0.0.0.0", "IP `address` to bind")
+	bindPort  = flag.Int("p", 8080, "TCP `port` number to bind")
+	nWorkers  = flag.Int("w", 5, "number of `workers` to execute callbacks for each host")
+	repoType  = flag.String("repo-type", "in-memory", "Repository `type`: in-memory, in-memory-ch, redis, mysql")
+	schedType = flag.String("sched-type", "ticker", "Scheduler `type`: ticker")
+	timeout   = flag.String("timeout", "5s", "time `duration` to timeout callback requests")
+)
 
 type config struct {
 	BindAddr        string
@@ -27,6 +31,7 @@ type config struct {
 	NumberOfWorkers int
 	RepositoryType  string
 	SchedulerType   string
+	CallbackTimeout time.Duration
 }
 
 func (c *config) ServerAddr() string {
@@ -35,12 +40,18 @@ func (c *config) ServerAddr() string {
 
 func readConfig() *config {
 	flag.Parse()
+	callbackTimeout, err := time.ParseDuration(*timeout)
+	if err != nil {
+		log.Fatalf("invalid timeout duration format: %v", err)
+	}
+
 	return &config{
 		BindAddr:        *bindAddr,
 		BindPort:        *bindPort,
 		NumberOfWorkers: *nWorkers,
 		RepositoryType:  *repoType,
 		SchedulerType:   *schedType,
+		CallbackTimeout: callbackTimeout,
 	}
 }
 
@@ -49,7 +60,7 @@ func main() {
 	config := readConfig()
 
 	repository := initRepository(config.RepositoryType)
-	executor := initCallbackExecutor(repository)
+	executor := initCallbackExecutor(config.CallbackTimeout)
 	scheduler := initScheduler(config.SchedulerType, repository, executor, config.NumberOfWorkers)
 
 	jobs := handler.NewJobsHandler("/jobs", repository)
@@ -73,8 +84,8 @@ func initRepository(repoType string) repository.Jobs {
 	return repository
 }
 
-func initCallbackExecutor(repository repository.Jobs) callback.Executor {
-	executor, err := callback.NewExecutor()
+func initCallbackExecutor(httpTimeout time.Duration) callback.Executor {
+	executor, err := callback.NewExecutor(httpTimeout)
 	if err != nil {
 		log.Fatalf("schedula: error initializing callback executor: %v", err)
 	}
@@ -82,7 +93,7 @@ func initCallbackExecutor(repository repository.Jobs) callback.Executor {
 }
 
 func initScheduler(schedulerType string, r repository.Jobs, e callback.Executor, nWorkers int) scheduler.Scheduler {
-	scheduler, err := scheduler.StartNew(schedulerType, r, e, scheduler.Config{NumberOfWorkers: nWorkers})
+	scheduler, err := scheduler.StartNew(schedulerType, r, e, scheduler.Config{WorkersPerHost: nWorkers})
 	if err != nil {
 		log.Fatalf("schedula: error initializing scheduler: %v", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/marcoshack/schedula/entity"
 	"github.com/marcoshack/schedula/repository"
@@ -16,9 +17,9 @@ type Executor interface {
 }
 
 // NewExecutor returns an instance of Executor
-func NewExecutor() (Executor, error) {
+func NewExecutor(httpTimeout time.Duration) (Executor, error) {
 	return &SynchronousExecutor{
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: httpTimeout},
 	}, nil
 }
 
