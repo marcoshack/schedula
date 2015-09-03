@@ -10,14 +10,14 @@ import (
 	"github.com/marcoshack/schedula/entity"
 )
 
-func TestNew(t *testing.T) {
+func Test_JobsInMemoryWithMutex_New(t *testing.T) {
 	_, err := New("in-memory")
 	if err != nil {
 		t.Fatalf("unable to initialize repository: %v", err)
 	}
 }
 
-func TestAdd(t *testing.T) {
+func Test_JobsInMemoryWithMutex_Add(t *testing.T) {
 	repo, _ := New("in-memory")
 	job, err := repo.Add(aJob())
 	if err != nil {
@@ -28,7 +28,7 @@ func TestAdd(t *testing.T) {
 	}
 }
 
-func TestGet(t *testing.T) {
+func Test_JobsInMemoryWithMutex_Get(t *testing.T) {
 	repo, _ := New("in-memory")
 	newJob, _ := repo.Add(entity.Job{})
 
@@ -38,7 +38,7 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestGetNonExistingJob(t *testing.T) {
+func Test_JobsInMemoryWithMutex_GetNonExistingJob(t *testing.T) {
 	repo, _ := New("in-memory")
 	job, _ := repo.Get("non-existing-job-id")
 	if job.ID != "" {
@@ -46,7 +46,7 @@ func TestGetNonExistingJob(t *testing.T) {
 	}
 }
 
-func TestList(t *testing.T) {
+func Test_JobsInMemoryWithMutex_List(t *testing.T) {
 	repo, _ := New("in-memory")
 	var n = addJobs(repo, 5)
 	jobs, _ := repo.List(0, 10)
@@ -55,7 +55,7 @@ func TestList(t *testing.T) {
 	}
 }
 
-func TestListWithPagination(t *testing.T) {
+func Test_JobsInMemoryWithMutex_ListWithPagination(t *testing.T) {
 	repo, _ := New("in-memory")
 	addJobs(repo, 10)
 	jobs, _ := repo.List(1, 5)
@@ -64,7 +64,7 @@ func TestListWithPagination(t *testing.T) {
 	}
 }
 
-func TestRemove(t *testing.T) {
+func Test_JobsInMemoryWithMutex_Remove(t *testing.T) {
 	repo, _ := New("in-memory")
 	initialSize := 5
 	expectedFinalSize := 4
@@ -90,7 +90,7 @@ func TestRemove(t *testing.T) {
 	}
 }
 
-func TestCancel(t *testing.T) {
+func Test_JobsInMemoryWithMutex_Cancel(t *testing.T) {
 	repo, _ := New("in-memory")
 	job, err := repo.Add(aJob())
 	if err != nil {
@@ -100,7 +100,7 @@ func TestCancel(t *testing.T) {
 	assertStatus(t, repo, job.ID, entity.JobStatusCanceled)
 }
 
-func TestAddExecution(t *testing.T) {
+func Test_JobsInMemoryWithMutex_AddExecution(t *testing.T) {
 	repo, _ := New("in-memory")
 	job, _ := repo.Add(aJob())
 	repo.AddExecution(job.ID, time.Now(), entity.JobStatusSuccess, "ok")

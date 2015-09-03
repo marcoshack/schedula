@@ -41,6 +41,7 @@ func main() {
 	}
 
 	jobsCreated := 0
+	start := time.Now()
 	for i := 1; i <= *numberOfCalbacks; i++ {
 		job := &Job{
 			CallbackURL: fmt.Sprintf("http://127.0.0.1:%d/callback/%d", *serverPort, i),
@@ -62,7 +63,7 @@ func main() {
 			log.Printf("ERROR: failed to create HTTP request: %v", reqErr)
 			continue
 		}
-		req.Header.Set("User-Agent", "schedula")
+		req.Header.Set("User-Agent", "schedula-client")
 		req.Header.Set("Content-Type", "application/json")
 
 		res, postErr := client.Do(req)
@@ -75,21 +76,23 @@ func main() {
 			log.Printf("ERROR: invalid response code, expected 201 Created but got %s", res.Status)
 			continue
 		}
-
-		log.Printf("INFO: callback created: %s", res.Header.Get("Location"))
 		jobsCreated++
 	}
 
-	http.HandleFunc("/callback/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("INFO: Callback received %s", r.URL.Path)
-	})
+	elapsed := time.Now().Sub(start).Seconds()
+	rps := int(float64(jobsCreated) / elapsed)
 
 	if jobsCreated > 0 {
+		log.Printf("INFO: %d callbacks created in %v seconds (~%d req/s)", jobsCreated, elapsed, rps)
+
 		server := &http.Server{
 			Addr: fmt.Sprintf("127.0.0.1:%d", *serverPort),
 		}
 
-		log.Printf("INFO: %d callbacks created", jobsCreated)
+		http.HandleFunc("/callback/", func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("INFO: Callback received %s", r.URL.Path)
+		})
+
 		log.Printf("INFO: Listening for callbacks on %s\n", server.Addr)
 		log.Fatal(server.ListenAndServe())
 
