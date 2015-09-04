@@ -95,21 +95,19 @@ func (s *TickerScheduler) context(job entity.Job) (*HostContext, error) {
 		return nil, fmt.Errorf("unable to retrieve host context, error parsing callback URL: %v", err)
 	}
 
-	var context *HostContext
 	if _, exists := s.HostContexts[url.Host]; !exists {
-		context = &HostContext{
+		s.HostContexts[url.Host] = &HostContext{
 			Host:     url.Host,
 			C:        make(chan entity.Job, 1000), // TODO think better about the host channel buffer size
 			LastUsed: time.Now(),
 			Workers:  s.Config.WorkersPerHost,
 		}
-		s.HostContexts[url.Host] = context
-		for i := 0; i < context.Workers; i++ {
-			go s.handle(context)
+		for i := 0; i < s.HostContexts[url.Host].Workers; i++ {
+			go s.handle(s.HostContexts[url.Host])
 		}
-		log.Printf("scheduler: host context for %s created with %d workers", context.Host, context.Workers)
+		log.Printf("scheduler: host context for %s created with %d workers", s.HostContexts[url.Host].Host, s.HostContexts[url.Host].Workers)
 	}
-	return context, nil
+	return s.HostContexts[url.Host], nil
 }
 
 func (s *TickerScheduler) handle(context *HostContext) {
