@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
+	"sync"
 	"time"
 )
 
@@ -22,58 +24,122 @@ type JobSchedule struct {
 	Value  string `json:"value"`
 }
 
+// ClientConfig ...
+type ClientConfig struct {
+	TotalCallbacks  int
+	CallbackBaseURL *url.URL
+	CallbackAddr    string
+	JobsResourceURL *url.URL
+	CallbackDelta   time.Duration
+	CallbackTime    time.Time
+	ResponseDelay   time.Duration
+}
+
+// CallbackURL creates a callback URL for the given `key`
+func (c *ClientConfig) CallbackURL(key string) *url.URL {
+	res, _ := url.Parse(fmt.Sprintf("%v%s", c.CallbackBaseURL, key))
+	return res
+}
+
+type callbackCounter struct {
+	sync.RWMutex
+	count int
+}
+
 var (
-	numberOfCalbacks  = flag.Int("n", 10, "`number` of callbacks to create")
-	serverPort        = flag.Int("p", 8088, "TCP `port` number to listen for HTTP callbacks")
-	serverAddr        = flag.String("b", "127.0.0.1", "IP `address` to listen for HTTP callbacks")
-	serverBaseURL     = flag.String("s", "http://localhost:8080/", "Schedula server base `URL`")
-	callbackTimeDelta = flag.Int("delta", 5, "delta in `seconds` from the current to create callbacks")
-	callbackResDelay  = flag.Int("delay", 0, "delay in `milliseconds` to respond to callback request")
+	nCallbacks    = flag.Int("n", 10, "`number` of callbacks to create")
+	callbackPort  = flag.Int("p", 8088, "TCP `port` number to listen for HTTP callbacks")
+	callbackAddr  = flag.String("b", "127.0.0.1", "IP `address` to listen for HTTP callbacks")
+	serverBaseURL = flag.String("s", "http://localhost:8080/", "Schedula server base `URL`")
+	callbackDelta = flag.Int("delta", 5, "delta in `seconds` from the current time to create callbacks")
+	responseDelay = flag.Int("delay", 0, "delay in `milliseconds` to respond to callback request")
 )
 
-func main() {
+func loadConfig() *ClientConfig {
 	flag.Parse()
-	callbackDelayDuration, _ := time.ParseDuration(fmt.Sprintf("%ds", *callbackTimeDelta))
-	callbackResDuration, _ := time.ParseDuration(fmt.Sprintf("%dms", *callbackResDelay))
-	callbackTime := time.Now().Add(callbackDelayDuration)
-	jobsURL := fmt.Sprintf("%sjobs/", *serverBaseURL)
+	serverURL, err := url.Parse(fmt.Sprintf("%sjobs/", *serverBaseURL))
+	if err != nil {
+		log.Fatalf("ERROR: invalid server base URL: %v", err)
+	}
+	callbackURL, err := url.Parse(fmt.Sprintf("http://%s:%d/callback/", *callbackAddr, *callbackPort))
+	if err != nil {
+		log.Fatalf("ERROR: invalid callback URL: %v", err)
+	}
+	delta, _ := time.ParseDuration(fmt.Sprintf("%ds", *callbackDelta))
+	delay, _ := time.ParseDuration(fmt.Sprintf("%dms", *responseDelay))
 
-	client := &http.Client{}
+	return &ClientConfig{
+		TotalCallbacks:  *nCallbacks,
+		CallbackAddr:    fmt.Sprintf("%s:%d", *callbackAddr, *callbackPort),
+		CallbackBaseURL: callbackURL,
+		JobsResourceURL: serverURL,
+		CallbackDelta:   delta,
+		CallbackTime:    time.Now().Add(delta),
+		ResponseDelay:   delay,
+	}
+}
 
-	_, err := client.Head(jobsURL)
+func startCallbackServer(conf *ClientConfig, jobsCreated int, done chan int) {
+	counter := callbackCounter{}
+	http.HandleFunc("/callback/", func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(conf.ResponseDelay)
+		counter.Lock()
+		counter.count++
+		if counter.count%100 == 0 || counter.count == jobsCreated {
+			log.Printf("INFO: %d/%d callback(s) received", counter.count, jobsCreated)
+		}
+		if counter.count == jobsCreated {
+			log.Printf("INFO: all callbacks received. terminating")
+			done <- 1
+		}
+		counter.Unlock()
+	})
+	server := &http.Server{Addr: conf.CallbackAddr}
+	log.Printf("INFO: Listening for callbacks on %s\n", server.Addr)
+	go server.ListenAndServe()
+}
+
+func checkServer(conf *ClientConfig, client *http.Client) {
+	_, err := client.Head(conf.JobsResourceURL.String())
 	if err != nil {
 		log.Fatalf("ERROR: schedula server is unavailable: %v", err)
 	}
+}
+
+func main() {
+	conf := loadConfig()
+	client := &http.Client{}
+	checkServer(conf, client)
 
 	jobsCreated := 0
 	start := time.Now()
-	for i := 1; i <= *numberOfCalbacks; i++ {
+	for i := 1; i <= conf.TotalCallbacks; i++ {
 		job := &Job{
-			CallbackURL: fmt.Sprintf("http://%s:%d/callback/%d", *serverAddr, *serverPort, i),
+			CallbackURL: conf.CallbackURL(fmt.Sprintf("%d", i)).String(),
 			Schedule: JobSchedule{
 				Format: "timestamp",
-				Value:  fmt.Sprintf("%v", callbackTime.Unix()),
+				Value:  fmt.Sprintf("%v", conf.CallbackTime.Unix()),
 			},
 		}
 
 		var body = new(bytes.Buffer)
-		encErr := json.NewEncoder(body).Encode(job)
-		if encErr != nil {
-			log.Printf("ERROR: unable to encode request body: %v", encErr)
+		err := json.NewEncoder(body).Encode(job)
+		if err != nil {
+			log.Printf("ERROR: unable to encode request body: %v", err)
 			continue
 		}
 
-		req, reqErr := http.NewRequest("POST", jobsURL, body)
-		if reqErr != nil {
-			log.Printf("ERROR: failed to create HTTP request: %v", reqErr)
+		req, err := http.NewRequest("POST", conf.JobsResourceURL.String(), body)
+		if err != nil {
+			log.Printf("ERROR: failed to create HTTP request: %v", err)
 			continue
 		}
 		req.Header.Set("User-Agent", "schedula-client")
 		req.Header.Set("Content-Type", "application/json")
 
-		res, postErr := client.Do(req)
-		if postErr != nil {
-			log.Printf("ERROR: failed to send HTTP request: %v", postErr)
+		res, err := client.Do(req)
+		if err != nil {
+			log.Printf("ERROR: failed to send HTTP request: %v", err)
 			continue
 		}
 
@@ -84,25 +150,16 @@ func main() {
 		jobsCreated++
 	}
 
+	if jobsCreated == 0 {
+		log.Printf("INFO: No jobs were created, terminating.")
+		return
+	}
+
 	elapsed := time.Now().Sub(start).Seconds()
 	rps := int(float64(jobsCreated) / elapsed)
+	log.Printf("INFO: %d callbacks created in %v seconds (~%d req/s)", jobsCreated, elapsed, rps)
 
-	if jobsCreated > 0 {
-		log.Printf("INFO: %d callbacks created in %v seconds (~%d req/s)", jobsCreated, elapsed, rps)
-
-		server := &http.Server{
-			Addr: fmt.Sprintf("%s:%d", *serverAddr, *serverPort),
-		}
-
-		http.HandleFunc("/callback/", func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(callbackResDuration)
-			log.Printf("INFO: Callback received %s", r.URL.Path)
-		})
-
-		log.Printf("INFO: Listening for callbacks on %s\n", server.Addr)
-		log.Fatal(server.ListenAndServe())
-
-	} else {
-		log.Printf("INFO: No jobs were created, terminating.")
-	}
+	done := make(chan int)
+	startCallbackServer(conf, jobsCreated, done)
+	<-done
 }
