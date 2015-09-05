@@ -89,7 +89,6 @@ func startCallbackServer(conf *ClientConfig, jobsCreated int, done chan int) {
 			log.Printf("INFO: %d/%d callback(s) received", counter.count, jobsCreated)
 		}
 		if counter.count == jobsCreated {
-			log.Printf("INFO: all callbacks received. terminating")
 			done <- 1
 		}
 		counter.Unlock()
@@ -125,13 +124,13 @@ func main() {
 		var body = new(bytes.Buffer)
 		err := json.NewEncoder(body).Encode(job)
 		if err != nil {
-			log.Printf("ERROR: unable to encode request body: %v", err)
+			log.Printf("ERROR: Unable to encode request body: %v", err)
 			continue
 		}
 
 		req, err := http.NewRequest("POST", conf.JobsResourceURL.String(), body)
 		if err != nil {
-			log.Printf("ERROR: failed to create HTTP request: %v", err)
+			log.Printf("ERROR: Failed to create HTTP request: %v", err)
 			continue
 		}
 		req.Header.Set("User-Agent", "schedula-client")
@@ -139,12 +138,12 @@ func main() {
 
 		res, err := client.Do(req)
 		if err != nil {
-			log.Printf("ERROR: failed to send HTTP request: %v", err)
+			log.Printf("ERROR: Failed to send HTTP request: %v", err)
 			continue
 		}
 
 		if res.StatusCode != http.StatusCreated {
-			log.Printf("ERROR: invalid response code, expected 201 Created but got %s", res.Status)
+			log.Printf("ERROR: Invalid response code, expected 201 Created but got %s", res.Status)
 			continue
 		}
 		jobsCreated++
@@ -162,4 +161,7 @@ func main() {
 	done := make(chan int)
 	startCallbackServer(conf, jobsCreated, done)
 	<-done
+	log.Printf("INFO: All callbacks received. Terminating ...")
+	time.Sleep(3 * time.Second)
+	log.Printf("INFO: Done.")
 }
