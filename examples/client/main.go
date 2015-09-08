@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
 )
 
@@ -33,6 +32,7 @@ type ClientConfig struct {
 	CallbackDelta   time.Duration
 	CallbackTime    time.Time
 	ResponseDelay   time.Duration
+	Timeout         time.Duration
 }
 
 // CallbackURL creates a callback URL for the given `key`
@@ -41,18 +41,14 @@ func (c *ClientConfig) CallbackURL(key string) *url.URL {
 	return res
 }
 
-type callbackCounter struct {
-	sync.RWMutex
-	count int
-}
-
 var (
 	nCallbacks    = flag.Int("n", 10, "`number` of callbacks to create")
 	callbackPort  = flag.Int("p", 8088, "TCP `port` number to listen for HTTP callbacks")
 	callbackAddr  = flag.String("b", "127.0.0.1", "IP `address` to listen for HTTP callbacks")
 	serverBaseURL = flag.String("s", "http://localhost:8080/", "Schedula server base `URL`")
-	callbackDelta = flag.Int("delta", 5, "delta in `seconds` from the current time to create callbacks")
+	callbackDelta = flag.Int("delta", 5, "delta in `seconds` from the current time to callbacks time")
 	responseDelay = flag.Int("delay", 0, "delay in `milliseconds` to respond to callback request")
+	timeout       = flag.Int("timeout", 30, "maximum number of `seconds` after callback time to wait for callbacks")
 )
 
 func loadConfig() *ClientConfig {
@@ -67,6 +63,7 @@ func loadConfig() *ClientConfig {
 	}
 	delta, _ := time.ParseDuration(fmt.Sprintf("%ds", *callbackDelta))
 	delay, _ := time.ParseDuration(fmt.Sprintf("%dms", *responseDelay))
+	timeout, _ := time.ParseDuration(fmt.Sprintf("%ds", *timeout))
 
 	return &ClientConfig{
 		TotalCallbacks:  *nCallbacks,
@@ -76,22 +73,14 @@ func loadConfig() *ClientConfig {
 		CallbackDelta:   delta,
 		CallbackTime:    time.Now().Add(delta),
 		ResponseDelay:   delay,
+		Timeout:         timeout,
 	}
 }
 
-func startCallbackServer(conf *ClientConfig, jobsCreated int, done chan int) {
-	counter := callbackCounter{}
+func startCallbackServer(conf *ClientConfig, callbacks chan int) {
 	http.HandleFunc("/callback/", func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(conf.ResponseDelay)
-		counter.Lock()
-		counter.count++
-		if counter.count%100 == 0 || counter.count == jobsCreated {
-			log.Printf("INFO: %d/%d callback(s) received", counter.count, jobsCreated)
-		}
-		if counter.count == jobsCreated {
-			done <- 1
-		}
-		counter.Unlock()
+		callbacks <- 1
 	})
 	server := &http.Server{Addr: conf.CallbackAddr}
 	log.Printf("INFO: Listening for callbacks on %s\n", server.Addr)
@@ -110,11 +99,11 @@ func main() {
 	client := &http.Client{}
 	checkServer(conf, client)
 
-	jobsCreated := 0
+	created := 0
 	start := time.Now()
 	for i := 1; i <= conf.TotalCallbacks; i++ {
 		job := &Job{
-			CallbackURL: conf.CallbackURL(fmt.Sprintf("%d", i)).String(),
+			CallbackURL: conf.CallbackURL(fmt.Sprintf("?id=%d", i)).String(),
 			Schedule: JobSchedule{
 				Format: "timestamp",
 				Value:  fmt.Sprintf("%v", conf.CallbackTime.Unix()),
@@ -146,22 +135,46 @@ func main() {
 			log.Printf("ERROR: Invalid response code, expected 201 Created but got %s", res.Status)
 			continue
 		}
-		jobsCreated++
+		created++
 	}
 
-	if jobsCreated == 0 {
+	if created == 0 {
 		log.Printf("INFO: No jobs were created, terminating.")
 		return
 	}
 
 	elapsed := time.Now().Sub(start).Seconds()
-	rps := int(float64(jobsCreated) / elapsed)
-	log.Printf("INFO: %d callbacks created in %v seconds (~%d req/s)", jobsCreated, elapsed, rps)
+	rps := int(float64(created) / elapsed)
+	log.Printf("INFO: %d callbacks created in %v seconds (~%d req/s)", created, elapsed, rps)
 
-	done := make(chan int)
-	startCallbackServer(conf, jobsCreated, done)
-	<-done
-	log.Printf("INFO: All callbacks received. Terminating ...")
-	time.Sleep(3 * time.Second)
+	timeout := make(chan bool, 1)
+	go func() {
+		timeoutTime := conf.CallbackTime.Add(conf.Timeout)
+		log.Printf("INFO: Timeout set to %v", timeoutTime)
+		time.Sleep(timeoutTime.Sub(time.Now()))
+		timeout <- true
+	}()
+
+	callbacks := make(chan int, conf.TotalCallbacks)
+	startCallbackServer(conf, callbacks)
+
+	received := 0
+ReceiveLoop:
+	for {
+		select {
+		case <-callbacks:
+			received++
+			switch {
+			case received%100 == 0 && received < created:
+				log.Printf("INFO: %d/%d callbacks received", received, created)
+			case received == created:
+				log.Printf("INFO: %d/%d callbacks received. Terminating ...", received, created)
+				break ReceiveLoop
+			}
+		case <-timeout:
+			log.Printf("INFO: Timeout. %d callbacks received. Terminating ...", received)
+			break ReceiveLoop
+		}
+	}
 	log.Printf("INFO: Done.")
 }
