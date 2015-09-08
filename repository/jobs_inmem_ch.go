@@ -107,6 +107,7 @@ func (r *JobsInMemoryWithChannels) Get(jobID string) (entity.Job, error) {
 }
 
 // Remove ...
+// TODO implementation pending
 func (r *JobsInMemoryWithChannels) Remove(jobID string) (entity.Job, error) {
 	return entity.Job{}, nil
 }
@@ -117,21 +118,25 @@ func (r *JobsInMemoryWithChannels) Cancel(jobID string) (entity.Job, error) {
 }
 
 // List ...
+// TODO implementation pending
 func (r *JobsInMemoryWithChannels) List(skip int, limit int) ([]entity.Job, error) {
 	return make([]entity.Job, 0), nil
 }
 
 // AddExecution ...
+// TODO implementation pending
 func (r *JobsInMemoryWithChannels) AddExecution(jobID string, date time.Time, status string, message string) (entity.Job, error) {
 	return entity.Job{}, nil
 }
 
 // Count ...
+// TODO implementation pending
 func (r *JobsInMemoryWithChannels) Count() int {
 	return len(r.JobsByID)
 }
 
 // ListBySchedule ...
+// TODO implementation pending
 func (r *JobsInMemoryWithChannels) ListBySchedule(timestamp int64) ([]entity.Job, error) {
 	return make([]entity.Job, 0), nil
 }
